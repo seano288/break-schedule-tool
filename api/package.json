@@ -1,0 +1,17 @@
+{
+  "name": "break-schedule-tool-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/functions/*.js",
+  "scripts": {
+    "start": "func start",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.5.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.5"
+  }
+}

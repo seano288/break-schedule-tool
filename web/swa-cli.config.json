@@ -1,0 +1,14 @@
+{
+    "$schema": "https://aka.ms/azure/static-web-apps-cli/schema",
+    "configurations": {
+        "tracer-bullet": {
+            "appLocation": ".",
+            "apiLocation": "../api",
+            "apiLanguage": "node",
+            "apiVersion": "20",
+            "outputLocation": ".",
+            "appBuildCommand": "",
+            "run": ""
+        }
+    }
+}

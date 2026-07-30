@@ -1,0 +1,8 @@
+*.test.js
+vitest.config.js
+local.settings.json
+local.settings.json.example
+test
+.git*
+.vscode
+__azurite_*

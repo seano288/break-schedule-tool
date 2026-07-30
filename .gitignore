@@ -21,6 +21,11 @@ Thumbs.db
 # Environment
 .env
 .env.local
+api/local.settings.json
+.azurite/
+
+# azd
+.azure/
 
 # Claude Code session data
 .claude/

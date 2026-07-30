@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: break-schedule-tool
+metadata:
+  template: break-schedule-tool-tracer-bullet@0.1.0
+services:
+  # The managed API is wired in via web/swa-cli.config.json (apiLocation: ../api), not
+  # a field here — azd only invokes the SWA CLI's own build/deploy (which bundles the
+  # managed API) when it finds a swa-cli.config.json in this service's project folder.
+  # See: https://github.com/Azure/azure-dev/blob/main/cli/azd/pkg/project/service_manager.go
+  web:
+    project: ./web
+    language: js
+    host: staticwebapp
