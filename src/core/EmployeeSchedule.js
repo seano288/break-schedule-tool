@@ -1,18 +1,22 @@
 import { SPLIT_SHIFT_GAP_THRESHOLD } from './constants.js';
+import { DEFAULT_RULESET } from './rulesets/index.js';
 
 /**
  * Represents all scheduled segments for a single employee on a given day.
  *
  * An employee with a split shift will have multiple segments (e.g., 8AM–12PM and 4PM–8PM).
  * This class centralizes the logic for determining total work time, gaps, and valid break windows —
- * which is critical for correct California labor law compliance on split shifts.
+ * which is critical for correct labor law compliance on split shifts. The meal/rest-break
+ * formulas themselves live behind a per-jurisdiction ruleset (see `./rulesets`).
  */
 export class EmployeeSchedule {
     /**
      * @param {string} name - The employee's formatted name (First Last)
+     * @param {Object} [ruleset] - Jurisdiction ruleset for meal/rest-break formulas; defaults to california
      */
-    constructor(name) {
+    constructor(name, ruleset = DEFAULT_RULESET) {
         this.name = name;
+        this.ruleset = ruleset;
         /** @type {Array<{dept: string, job: string, start: number, end: number, rowIndex: number}>} */
         this.segments = [];
     }
@@ -116,51 +120,31 @@ export class EmployeeSchedule {
 
     /**
      * For a split shift employee, determine whether the split gap itself counts as the
-     * meal period. The gap must be >= 30 minutes and occur within the first 5 hours of work.
+     * meal period, per the active ruleset.
      *
      * If true, no additional meal break should be scheduled unless the employee works
-     * > 9:45 of total time (i.e., they need a second meal period).
+     * long enough to need a second meal period.
      */
     gapSatisfiesMealPeriod() {
         if (!this.isSplitShift) return false;
-        const lg = this.largestGap;
-        return lg !== null && lg.duration >= 30;
+        return this.ruleset.gapSatisfiesMealPeriod(this.largestGap);
     }
 
     /**
-     * Determine how many meal periods are legally required.
+     * Determine how many meal periods are legally required, per the active ruleset.
      * Accounts for split shifts where the gap itself satisfies the first meal period.
-     *
-     * California law (IWC Wage Orders):
-     * - >= 5 hours worked (300 min): 1 meal period
-     * - >= 10 hours worked (600 min): 2 meal periods
      */
     mealsRequired() {
-        const work = this.totalWorkMinutes;
-        let required = 0;
-        if (work >= 300) required = 1;
-        if (work >= 600) required = 2;
-
-        // If the split gap satisfies the first meal, reduce required by 1
-        // (but still need the second meal if totalWork > 9:45)
-        if (this.gapSatisfiesMealPeriod() && required >= 1) {
-            required -= 1;
-        }
-
-        return required;
+        return this.ruleset.mealsRequired(this.totalWorkMinutes, this.gapSatisfiesMealPeriod());
     }
 
     /**
-     * Determine how many rest breaks are legally required.
-     *
-     * Strict CA DLSE formula: one paid 10-minute rest per 4-hour work period or
-     * major fraction thereof. "Major fraction" = strictly more than 2 hours (120 min).
-     * No break required if total scheduled time is less than 3.5 hours (210 min).
+     * Determine how many rest breaks are legally required, per the active ruleset.
      *
      * Rest breaks are paid and count as time worked, so no meal deduction is applied.
      * Uses total segment minutes (sum of all shift segments).
      *
-     * Examples:
+     * Examples (california ruleset):
      *   3h  (180 min) → 0   (below 3.5h threshold)
      *   3.5h (210 min) → 1   (major fraction of first 4h period)
      *   6h  (360 min) → 1   (1 full period + 2h remainder, NOT > 2h)
@@ -169,9 +153,7 @@ export class EmployeeSchedule {
      *   11h (660 min) → 3   (2 full periods + 3h remainder > 2h)
      */
     restBreaksRequired() {
-        const total = this.totalWorkMinutes;
-        if (total < 210) return 0;
-        return Math.floor(total / 240) + (total % 240 > 120 ? 1 : 0);
+        return this.ruleset.restBreaksRequired(this.totalWorkMinutes);
     }
 
     /**

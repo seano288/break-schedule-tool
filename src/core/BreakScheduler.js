@@ -1,4 +1,4 @@
-import { DEFAULT_GROUPS, DEFAULT_ADVANCED_SETTINGS, DEFAULT_OPERATING_HOURS, MAX_WORK_BEFORE_MEAL } from './constants.js';
+import { DEFAULT_GROUPS, DEFAULT_ADVANCED_SETTINGS, DEFAULT_OPERATING_HOURS } from './constants.js';
 import { formatName, parseShiftInterval, findGroupContaining } from './helpers.js';
 import { minutesToTime } from './helpers.js';
 import { EmployeeSchedule } from './EmployeeSchedule.js';
@@ -52,7 +52,7 @@ function parseScheduleRows(rows, dataStart, shiftCol) {
  * Smaller = less flexible = should be scheduled first.
  */
 function mealWindowSize(empSchedule) {
-    const MEAL_DURATION = 30;
+    const { MEAL_DURATION, MAX_WORK_BEFORE_MEAL } = empSchedule.ruleset;
     const mealsNeeded = empSchedule.mealsRequired();
     if (mealsNeeded === 0) return Infinity;
     const netWork = empSchedule.totalWorkMinutes - mealsNeeded * MEAL_DURATION;
@@ -167,7 +167,7 @@ export function scheduleBreaks(schedule, options = {}) {
         const { dept, job: subdept } = empSchedule.primaryDept();
         const group = findGroupContaining(dept, subdept, groups);
 
-        const MEAL_DURATION = 30;
+        const { MEAL_DURATION, MAX_WORK_BEFORE_MEAL } = empSchedule.ruleset;
         // Net worked time = total segment minutes minus all expected meal periods
         const netWork = empSchedule.totalWorkMinutes - mealsNeeded * MEAL_DURATION;
 
@@ -335,7 +335,7 @@ function scheduleRestBreak(
         empName: name,
         empSchedule,
         idealTime,
-        breakDuration: 15,
+        breakDuration: empSchedule.ruleset.REST_DURATION,
         breakSlot: slot,
         dept, subdept, group, breaks,
         employeeSchedules,
@@ -425,13 +425,14 @@ function swapBreaksForScheduleOrder(
 }
 
 function slotDuration(empSchedule, slot) {
-    if (slot === 'meal') return 30;
+    const { MEAL_DURATION, REST_DURATION } = empSchedule.ruleset;
+    if (slot === 'meal') return MEAL_DURATION;
     if (slot === 'rest3') {
         // rest3 holds a 3rd rest if the employee qualifies for one; otherwise it holds
         // the 2nd meal placed for 10h+ shifts (see "Resolve second meal periods" pass).
-        return empSchedule.restBreaksRequired() >= 3 ? 15 : 30;
+        return empSchedule.restBreaksRequired() >= 3 ? REST_DURATION : MEAL_DURATION;
     }
-    return 15;
+    return REST_DURATION;
 }
 
 function deepCloneBreaksObj(breaks) {
@@ -489,9 +490,10 @@ function adjustForMeals(rawTime, mealStarts) {
  * @returns {number} Ideal clock time for the break, rounded to the 15-min grid
  */
 function computeIdealRestClock(periodIndex, empSchedule, scheduledMeals) {
+    const restPeriod = empSchedule.ruleset.REST_PERIOD;
     const totalWork = empSchedule.totalWorkMinutes;
-    const periodStart = (periodIndex - 1) * 240;
-    const periodEnd = Math.min(periodIndex * 240, totalWork);
+    const periodStart = (periodIndex - 1) * restPeriod;
+    const periodEnd = Math.min(periodIndex * restPeriod, totalWork);
     if (periodEnd <= periodStart) return empSchedule.overallStart;
 
     // Primary: use the period's worked-time midpoint when it lands inside a real

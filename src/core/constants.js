@@ -51,15 +51,6 @@ export const DEFAULT_ADVANCED_SETTINGS = {
     idealMealOffset: 240
 };
 
-/**
- * CA DLSE meal violation threshold in minutes.
- * An employee cannot work more than 5 hours (300 min) continuously without a meal.
- * This constant is set to 285 (4h 45m) as the latest safe start — scheduling the meal
- * here means the employee returns after 5h15m of shift time but only 4h45m of worked
- * time, leaving a compliance buffer before the 5h worked trigger.
- */
-export const MAX_WORK_BEFORE_MEAL = 285;
-
 /** Default operating hours (10 AM – 9 PM) */
 export const DEFAULT_OPERATING_HOURS = {
     startTime: 10 * 60,
