@@ -7,7 +7,6 @@ import {
     SHORT_SHIFT_SCHEDULE,
     MEAL_GAP_SCHEDULE,
     SHORT_FIRST_SPLIT_SCHEDULE,
-    TEST_GROUPS,
     TEST_ADV_SETTINGS,
     TEST_OPERATING_HOURS
 } from '../fixtures/scheduleData.js';
