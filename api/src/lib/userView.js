@@ -1,31 +1,94 @@
 /**
  * Server-rendered HTML for the Users screen — Admin-only, matching
- * locationView.js/onboardingView.js's plain-forms style.
+ * locationView.js/onboardingView.js's plain-forms style, plus a small inline
+ * script on the invite form to toggle/require the Location checkboxes
+ * client-side (the server independently enforces the same rule).
  */
 
-export function renderUsersPage({ users, error, notice } = {}) {
+export function renderUsersPage({ users, locations = [], error, notice } = {}) {
     return page(`
         <h1>Users</h1>
         ${error ? `<p class="error">${escapeHtml(error)}</p>` : ''}
         ${notice ? `<p class="notice">${escapeHtml(notice)}</p>` : ''}
-        ${renderInviteForm()}
+        ${renderInviteForm(locations)}
         ${renderUserList(users)}
     `);
 }
 
-function renderInviteForm() {
+function renderInviteForm(locations) {
+    const hasLocations = locations.length > 0;
     return `
         <section>
             <h2>Invite a User</h2>
-            <form method="post" action="/api/users/invite">
+            <form method="post" action="/api/users/invite" id="invite-form">
                 <label for="role">Role</label>
                 <select id="role" name="role" required>
                     <option value="Manager">Manager</option>
                     <option value="Admin">Admin</option>
                 </select>
-                <button type="submit">Generate invite code</button>
+                ${hasLocations ? renderInviteLocations(locations) : ''}
+                <button type="submit" id="invite-submit">Generate invite code</button>
             </form>
         </section>
+        ${hasLocations ? renderInviteFormScript() : ''}
+    `;
+}
+
+function renderInviteLocations(locations) {
+    return `
+        <div id="invite-locations">
+            <p>Locations</p>
+            <ul>
+                ${locations.map(location => `
+                    <li>
+                        <label>
+                            <input type="checkbox" name="locationIds" value="${escapeHtml(location.id)}">
+                            ${escapeHtml(location.name)}
+                        </label>
+                    </li>
+                `).join('')}
+            </ul>
+            <p class="error" id="invite-locations-message" hidden>Select at least one Location.</p>
+        </div>
+    `;
+}
+
+function renderInviteFormScript() {
+    return `
+        <script>
+        (function () {
+            var form = document.getElementById('invite-form');
+            var roleSelect = document.getElementById('role');
+            var locationsSection = document.getElementById('invite-locations');
+            var message = document.getElementById('invite-locations-message');
+            var submitButton = document.getElementById('invite-submit');
+
+            function checkboxes() {
+                return Array.prototype.slice.call(form.querySelectorAll('input[name="locationIds"]'));
+            }
+
+            function isManagerBlocked() {
+                return roleSelect.value === 'Manager' && !checkboxes().some(function (cb) { return cb.checked; });
+            }
+
+            function update() {
+                var isManager = roleSelect.value === 'Manager';
+                locationsSection.hidden = !isManager;
+                var blocked = isManagerBlocked();
+                message.hidden = !blocked;
+                submitButton.disabled = blocked;
+            }
+
+            form.addEventListener('submit', function (event) {
+                if (isManagerBlocked()) {
+                    event.preventDefault();
+                }
+            });
+            roleSelect.addEventListener('change', update);
+            checkboxes().forEach(function (cb) { cb.addEventListener('change', update); });
+            update();
+        })();
+        </script>
     `;
 }
 

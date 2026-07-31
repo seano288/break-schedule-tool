@@ -1,7 +1,7 @@
 import { app } from '@azure/functions';
 import { parseClientPrincipal } from '../lib/clientPrincipal.js';
 import { getFacade } from '../lib/facadeInstance.js';
-import { listUsersForCompany } from '../lib/userService.js';
+import { listInvitableLocations, listUsersForCompany } from '../lib/userService.js';
 import { renderUsersPage } from '../lib/userView.js';
 
 export async function usersListHandler(request) {
@@ -20,10 +20,11 @@ export async function usersListHandler(request) {
     }
 
     const users = await listUsersForCompany(facade, { companyId: link.companyId });
+    const locations = await listInvitableLocations(facade, { companyId: link.companyId });
     return {
         status: 200,
         headers: { 'content-type': 'text/html' },
-        body: renderUsersPage({ users })
+        body: renderUsersPage({ users, locations })
     };
 }
 

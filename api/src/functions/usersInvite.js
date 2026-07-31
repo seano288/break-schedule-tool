@@ -21,7 +21,11 @@ export async function usersInviteHandler(request) {
 
     const form = new URLSearchParams(await request.text());
     return runUserInviteAction(facade, link, () =>
-        createInviteForCompany(facade, { companyId: link.companyId, role: form.get('role') })
+        createInviteForCompany(facade, {
+            companyId: link.companyId,
+            role: form.get('role'),
+            locationIds: form.getAll('locationIds')
+        })
     );
 }
 

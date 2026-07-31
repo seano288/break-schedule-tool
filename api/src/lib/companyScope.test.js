@@ -5,6 +5,7 @@ import { TEST_TABLE_CONNECTION_STRING } from '../../tests/testTableConnection.js
 import {
     ScopeError,
     assertLocationBelongsToCompany,
+    assertLocationsBelongToCompany,
     assertUserBelongsToCompany,
     assertViewerAssignedToLocation
 } from './companyScope.js';
@@ -64,6 +65,42 @@ describe('companyScope', () => {
 
         it('rejects an unknown Location id', async () => {
             await expect(assertLocationBelongsToCompany(facade, randomUUID(), randomUUID()))
+                .rejects.toMatchObject({ reason: 'not-found' });
+        });
+    });
+
+    describe('assertLocationsBelongToCompany', () => {
+        it('resolves when every Location belongs to the given Company', async () => {
+            const companyId = randomUUID();
+            const locationA = await seedLocation(companyId);
+            const locationB = await seedLocation(companyId);
+
+            await expect(assertLocationsBelongToCompany(facade, companyId, [locationA.id, locationB.id]))
+                .resolves.toEqual(expect.arrayContaining([
+                    expect.objectContaining({ id: locationA.id }),
+                    expect.objectContaining({ id: locationB.id })
+                ]));
+        });
+
+        it('resolves to an empty array for an empty id list', async () => {
+            await expect(assertLocationsBelongToCompany(facade, randomUUID(), [])).resolves.toEqual([]);
+        });
+
+        it('rejects the whole batch if any id belongs to a different Company', async () => {
+            const companyA = randomUUID();
+            const companyB = randomUUID();
+            const ownLocation = await seedLocation(companyA);
+            const foreignLocation = await seedLocation(companyB);
+
+            await expect(assertLocationsBelongToCompany(facade, companyA, [ownLocation.id, foreignLocation.id]))
+                .rejects.toMatchObject({ reason: 'not-found' });
+        });
+
+        it('rejects the whole batch if any id is unknown', async () => {
+            const companyId = randomUUID();
+            const ownLocation = await seedLocation(companyId);
+
+            await expect(assertLocationsBelongToCompany(facade, companyId, [ownLocation.id, randomUUID()]))
                 .rejects.toMatchObject({ reason: 'not-found' });
         });
     });

@@ -9,6 +9,7 @@ import { usersRoleHandler } from './usersRole.js';
 import { usersRevokeHandler } from './usersRevoke.js';
 import { onboardingStatusHandler } from './onboardingStatus.js';
 import { locationsListHandler } from './locationsList.js';
+import { onboardingRedeemInviteHandler } from './onboardingRedeemInvite.js';
 
 // These handlers resolve TABLE_STORAGE_CONNECTION_STRING via getFacade() — set in
 // vitest.config.js to point at the same test Azurite instance as this seeding facade.
@@ -53,6 +54,18 @@ describe('users endpoints', () => {
             createdAt: '2026-07-30T00:00:00.000Z'
         });
         return userId;
+    }
+
+    async function seedLocation(companyId, overrides = {}) {
+        return seedFacade.createLocation({
+            id: randomUUID(),
+            companyId,
+            name: 'Downtown',
+            coverageGroups: [],
+            settings: {},
+            createdAt: '2026-07-30T00:00:00.000Z',
+            ...overrides
+        });
     }
 
     describe('GET /api/users', () => {
@@ -106,7 +119,52 @@ describe('users endpoints', () => {
             expect(response.status).toBe(403);
         });
 
-        it('generates a Company-wide invite code for the given role and shows it to the Admin', async () => {
+        it('generates a Company-wide invite code for an Admin invite and shows it to the Admin', async () => {
+            const company = await seedCompany();
+            const adminId = await seedAdmin(company.id);
+
+            const response = await usersInviteHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(adminId),
+                body: new URLSearchParams({ role: 'Admin' }).toString()
+            }));
+
+            expect(response.status).toBe(200);
+            expect(response.body).toContain('Invite code');
+            expect(response.body).toContain('Admin');
+        });
+
+        it('forces locationIds to empty for an Admin invite even if Locations were submitted', async () => {
+            const company = await seedCompany();
+            const adminId = await seedAdmin(company.id);
+            const location = await seedLocation(company.id);
+
+            const response = await usersInviteHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(adminId),
+                body: new URLSearchParams([['role', 'Admin'], ['locationIds', location.id]]).toString()
+            }));
+
+            expect(response.status).toBe(200);
+        });
+
+        it('generates a Manager invite scoped to the submitted Locations', async () => {
+            const company = await seedCompany();
+            const adminId = await seedAdmin(company.id);
+            const location = await seedLocation(company.id);
+
+            const response = await usersInviteHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(adminId),
+                body: new URLSearchParams([['role', 'Manager'], ['locationIds', location.id]]).toString()
+            }));
+
+            expect(response.status).toBe(200);
+            expect(response.body).toContain('Invite code');
+            expect(response.body).toContain('Manager');
+        });
+
+        it('blocks a Manager invite with no Locations selected, server-side', async () => {
             const company = await seedCompany();
             const adminId = await seedAdmin(company.id);
 
@@ -116,9 +174,28 @@ describe('users endpoints', () => {
                 body: new URLSearchParams({ role: 'Manager' }).toString()
             }));
 
-            expect(response.status).toBe(200);
-            expect(response.body).toContain('Invite code');
-            expect(response.body).toContain('Manager');
+            expect(response.status).toBe(400);
+            expect(response.body).toContain('Select at least one Location');
+        });
+
+        it('rejects a Manager invite naming a Location from a different Company, failing the whole request', async () => {
+            const companyA = await seedCompany();
+            const companyB = await seedCompany();
+            const adminId = await seedAdmin(companyA.id);
+            const ownLocation = await seedLocation(companyA.id);
+            const foreignLocation = await seedLocation(companyB.id);
+
+            const response = await usersInviteHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(adminId),
+                body: new URLSearchParams([
+                    ['role', 'Manager'],
+                    ['locationIds', ownLocation.id],
+                    ['locationIds', foreignLocation.id]
+                ]).toString()
+            }));
+
+            expect(response.status).toBe(404);
         });
 
         it('re-renders the list with a clear error for an invalid role', async () => {
@@ -133,6 +210,40 @@ describe('users endpoints', () => {
 
             expect(response.status).toBe(400);
             expect(response.body).toContain('Role must be Admin or Manager');
+        });
+
+        it('persists the submitted locationIds so redeeming produces a Manager scoped to exactly those Locations', async () => {
+            const company = await seedCompany();
+            const adminId = await seedAdmin(company.id);
+            const locationA = await seedLocation(company.id, { name: 'Downtown' });
+            const locationB = await seedLocation(company.id, { name: 'Uptown' });
+
+            const inviteResponse = await usersInviteHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(adminId),
+                body: new URLSearchParams([
+                    ['role', 'Manager'],
+                    ['locationIds', locationA.id],
+                    ['locationIds', locationB.id]
+                ]).toString()
+            }));
+            expect(inviteResponse.status).toBe(200);
+
+            const codeMatch = inviteResponse.body.match(/Invite code for Manager: ([\w-]+)/);
+            expect(codeMatch).not.toBeNull();
+            const code = codeMatch[1];
+
+            const newUserId = randomUUID();
+            const redeemResponse = await onboardingRedeemInviteHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(newUserId),
+                body: new URLSearchParams({ code }).toString()
+            }));
+
+            expect(redeemResponse.status).toBe(303);
+            const link = await seedFacade.getUserLink(newUserId);
+            expect(link.role).toBe('Manager');
+            expect(link.locationIds.sort()).toEqual([locationA.id, locationB.id].sort());
         });
     });
 

@@ -1,9 +1,10 @@
-import { listUsersForCompany } from './userService.js';
+import { listInvitableLocations, listUsersForCompany } from './userService.js';
 import { ScopeError } from './companyScope.js';
 import { renderUsersPage } from './userView.js';
 
 const STATUS_BY_REASON = {
     'invalid-role': 400,
+    'locations-required': 400,
     'not-found': 404
 };
 
@@ -50,11 +51,13 @@ export async function runUserInviteAction(facade, link, action) {
     }
 
     const users = await listUsersForCompany(facade, { companyId: link.companyId });
+    const locations = await listInvitableLocations(facade, { companyId: link.companyId });
     return {
         status: 200,
         headers: { 'content-type': 'text/html' },
         body: renderUsersPage({
             users,
+            locations,
             notice: `Invite code for ${invite.role}: ${invite.code} (expires ${invite.expiresAt})`
         })
     };
@@ -62,9 +65,10 @@ export async function runUserInviteAction(facade, link, action) {
 
 async function renderUsersError(facade, link, err) {
     const users = await listUsersForCompany(facade, { companyId: link.companyId });
+    const locations = await listInvitableLocations(facade, { companyId: link.companyId });
     return {
         status: STATUS_BY_REASON[err.reason] ?? 400,
         headers: { 'content-type': 'text/html' },
-        body: renderUsersPage({ users, error: err.message })
+        body: renderUsersPage({ users, locations, error: err.message })
     };
 }

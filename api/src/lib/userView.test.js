@@ -49,5 +49,32 @@ describe('userView', () => {
             expect(html).not.toContain('<script>alert(1)</script>');
             expect(html).toContain('&lt;script&gt;');
         });
+
+        it('renders a Location checkbox for each non-archived Location', () => {
+            const html = renderUsersPage({
+                users: [],
+                locations: [{ id: 'loc-1', name: 'Downtown' }, { id: 'loc-2', name: 'Uptown' }]
+            });
+
+            expect(html).toContain('name="locationIds" value="loc-1"');
+            expect(html).toContain('name="locationIds" value="loc-2"');
+            expect(html).toContain('Downtown');
+            expect(html).toContain('Uptown');
+        });
+
+        it('escapes HTML in a Location\'s name', () => {
+            const html = renderUsersPage({
+                users: [],
+                locations: [{ id: 'loc-1', name: '<script>alert(1)</script>' }]
+            });
+
+            expect(html).not.toContain('<script>alert(1)</script>');
+            expect(html).toContain('&lt;script&gt;');
+        });
+
+        it('renders no Location checkboxes when there are no Locations', () => {
+            const html = renderUsersPage({ users: [], locations: [] });
+            expect(html).not.toContain('name="locationIds"');
+        });
     });
 });

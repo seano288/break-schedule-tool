@@ -53,6 +53,22 @@ export function assertViewerAssignedToLocation(location, { role, locationIds }) 
 }
 
 /**
+ * Resolves a batch of Location ids, scoped to the caller's Company. Fails the whole
+ * batch — rather than silently dropping the bad ones — if any id doesn't belong to
+ * the caller's Company, so a request can't smuggle in a foreign Location by mixing
+ * it with valid ones.
+ *
+ * @param {import('../facades/TableStorageFacade.js').TableStorageFacade} facade
+ * @param {string} companyId
+ * @param {string[]} locationIds
+ * @returns {Promise<object[]>} the Locations, in the same order as `locationIds`
+ * @throws {ScopeError} 'not-found' if any Location id doesn't belong to this Company
+ */
+export async function assertLocationsBelongToCompany(facade, companyId, locationIds) {
+    return Promise.all(locationIds.map(locationId => assertLocationBelongsToCompany(facade, companyId, locationId)));
+}
+
+/**
  * Resolves a User's UserLink by id, scoped to the caller's Company. This is the one place
  * that decides whether a User id in a request belongs to the caller's Company.
  *
