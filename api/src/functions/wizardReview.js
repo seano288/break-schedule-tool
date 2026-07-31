@@ -5,7 +5,7 @@ import { assertLocationEditableByViewer } from '../lib/settingsService.js';
 import { ScopeError } from '../lib/companyScope.js';
 import { settingsErrorResponse } from '../lib/settingsHttp.js';
 import { renderWizardUploadPage, renderWizardReviewPage } from '../lib/wizardView.js';
-import { parseScheduleForReview } from '../lib/scheduleFile.js';
+import { parseScheduleForReview, extractDepartments } from '../lib/scheduleFile.js';
 
 export async function wizardReviewHandler(request) {
     const principal = parseClientPrincipal(request.headers.get('x-ms-client-principal'));
@@ -52,10 +52,12 @@ export async function wizardReviewHandler(request) {
         };
     }
 
+    const displayDays = result.days.map(day => ({ date: day.date, departments: extractDepartments(day.rows) }));
+
     return {
         status: 200,
         headers: { 'content-type': 'text/html' },
-        body: renderWizardReviewPage({ location, days: result.days })
+        body: renderWizardReviewPage({ location, days: displayDays, scheduleData: result.days })
     };
 }
 

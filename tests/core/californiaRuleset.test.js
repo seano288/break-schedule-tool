@@ -49,6 +49,13 @@ describe('california ruleset — wiring', () => {
         const emp = new EmployeeSchedule('Alice Smith');
         expect(emp.ruleset).toBe(california);
     });
+
+    it('scheduleBreaks threads an explicit ruleset option into every EmployeeSchedule it builds', () => {
+        const { employeeSchedules } = scheduleBreaks(BASIC_SCHEDULE, { ...OPTIONS, ruleset: california });
+        for (const empSchedule of employeeSchedules.values()) {
+            expect(empSchedule.ruleset).toBe(california);
+        }
+    });
 });
 
 describe('california ruleset — byte-identical regression vs pre-refactor implementation', () => {

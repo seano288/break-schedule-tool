@@ -2,15 +2,19 @@ import * as XLSX from 'xlsx';
 
 /**
  * Parses and validates an uploaded UKG daily-schedule .xlsx export, entirely in memory,
- * into a review-ready summary of departments/employees/shifts for each day found in the
- * file. Mirrors src/facades/ExcelFacade.js's parseWorkbook/validateScheduleStructure/
- * splitIntoDailySchedules logic and src/core/BreakScheduler.js's department/employee row
- * detection, but is duplicated here rather than imported: api/ is deployed standalone
- * (see api/src/lib/defaultTemplate.js's note), so a relative import reaching outside
- * api/ would work locally but not in production.
+ * into the raw per-day rows found in the file. Mirrors src/facades/ExcelFacade.js's
+ * parseWorkbook/validateScheduleStructure/splitIntoDailySchedules logic, but is
+ * duplicated here rather than imported: api/ is deployed standalone (see
+ * api/src/lib/defaultTemplate.js's note), so a relative import reaching outside api/
+ * would work locally but not in production.
+ *
+ * The raw rows (rather than a display-only summary) are returned because they're what
+ * the wizard's calculate step needs to round-trip forward via the review page's hidden
+ * `scheduleData` field — see extractDepartments() below for the review page's own,
+ * display-only view of the same rows.
  *
  * @param {ArrayBuffer|Buffer} buffer
- * @returns {{ isValid: true, days: Array<{ date: string, departments: Array<{ name: string, employees: Array<{ name: string, job: string, shift: string }> }> }> } | { isValid: false, error: string }}
+ * @returns {{ isValid: true, days: Array<{ date: string, rows: Array<Array> }> } | { isValid: false, error: string }}
  */
 export function parseScheduleForReview(buffer) {
     const parsed = parseWorkbook(buffer);
@@ -23,10 +27,7 @@ export function parseScheduleForReview(buffer) {
         return { isValid: false, error: structure.error };
     }
 
-    const days = splitIntoDailySchedules(parsed.rowData).map(({ date, rows }) => ({
-        date,
-        departments: extractDepartments(rows)
-    }));
+    const days = splitIntoDailySchedules(parsed.rowData);
 
     if (!days.length) {
         return { isValid: false, error: 'No valid schedule found in the uploaded file.' };
@@ -105,7 +106,7 @@ function splitIntoDailySchedules(rowData) {
  * decorative "Dept/Job/Name" line before the real column-header row that also labels
  * the Shift/rest/meal columns.
  */
-function findDataStart(rows) {
+export function findDataStart(rows) {
     let dataStart = 8;
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
@@ -128,7 +129,7 @@ function findColumn(headerRow, label) {
  * header, col C = employee name) without computing breaks — this is a display-only
  * summary for the review screen.
  */
-function extractDepartments(rows) {
+export function extractDepartments(rows) {
     const dataStart = findDataStart(rows);
     const shiftCol = findColumn(rows[dataStart - 1], 'Shift');
 

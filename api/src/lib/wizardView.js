@@ -33,14 +33,14 @@ export function renderWizardUploadPage({ location, error } = {}) {
     `);
 }
 
-export function renderWizardReviewPage({ location, days }) {
+export function renderWizardReviewPage({ location, days, scheduleData }) {
     return page(`
         <h1>Review schedule: ${escapeHtml(location.name)}</h1>
         <p><a href="/api/wizard">Start over</a></p>
         ${days.map(renderDay).join('')}
         <form method="post" action="/api/wizard/calculate">
             <input type="hidden" name="locationId" value="${escapeHtml(location.id)}">
-            <input type="hidden" name="scheduleData" value="${escapeHtml(JSON.stringify(days))}">
+            <input type="hidden" name="scheduleData" value="${escapeHtml(JSON.stringify(scheduleData))}">
             <button type="submit">Calculate breaks</button>
         </form>
     `);

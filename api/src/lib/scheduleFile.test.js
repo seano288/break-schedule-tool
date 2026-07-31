@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { describe, expect, it } from 'vitest';
-import { parseScheduleForReview } from './scheduleFile.js';
+import { parseScheduleForReview, extractDepartments } from './scheduleFile.js';
 
 const VALID_ROWS = [
     ['Date: 2024-01-15'],
@@ -39,7 +39,7 @@ describe('parseScheduleForReview', () => {
         expect(result.error).toMatch(/Could not read file/i);
     });
 
-    it('parses a valid single-day schedule into departments, employees, and shifts', () => {
+    it('parses a valid single-day schedule into raw per-day rows', () => {
         const buffer = bufferFromRows(VALID_ROWS);
 
         const result = parseScheduleForReview(buffer);
@@ -47,21 +47,11 @@ describe('parseScheduleForReview', () => {
         expect(result.isValid).toBe(true);
         expect(result.days).toHaveLength(1);
         expect(result.days[0].date).toBe('2024-01-15');
-        expect(result.days[0].departments).toEqual([
-            {
-                name: 'Cashier',
-                employees: [
-                    { name: 'Alice Smith', job: 'Cashier', shift: '8:00AM-4:30PM' },
-                    { name: 'Bob Jones', job: 'Cashier', shift: '9:00AM-3:00PM' }
-                ]
-            },
-            {
-                name: 'Clothing',
-                employees: [
-                    { name: 'Dave Wilson', job: 'Clothing', shift: '10:00AM-2:00PM' }
-                ]
-            }
-        ]);
+        // Round-tripped through XLSX (not compared against VALID_ROWS directly, since
+        // sheet_to_json represents empty cells as `undefined` rather than the literal
+        // `null`s used above) — extractDepartments below covers the meaningful content.
+        expect(result.days[0].rows[6]).toEqual(['Dept', 'Job', 'Name', 'Shift', '15', '30', '15']);
+        expect(result.days[0].rows[8][2]).toBe('Smith, Alice');
     });
 
     it('splits a multi-day export into one entry per day', () => {
@@ -82,8 +72,28 @@ describe('parseScheduleForReview', () => {
         expect(result.days).toHaveLength(2);
         expect(result.days[0].date).toBe('2024-01-15');
         expect(result.days[1].date).toBe('2024-01-16');
-        expect(result.days[1].departments[0].employees).toEqual([
+        expect(extractDepartments(result.days[1].rows)[0].employees).toEqual([
             { name: 'Grace Lee', job: 'Cashier', shift: '7:00AM-3:00PM' }
+        ]);
+    });
+});
+
+describe('extractDepartments', () => {
+    it('groups employees under their department, reformatting names to "First Last"', () => {
+        expect(extractDepartments(VALID_ROWS)).toEqual([
+            {
+                name: 'Cashier',
+                employees: [
+                    { name: 'Alice Smith', job: 'Cashier', shift: '8:00AM-4:30PM' },
+                    { name: 'Bob Jones', job: 'Cashier', shift: '9:00AM-3:00PM' }
+                ]
+            },
+            {
+                name: 'Clothing',
+                employees: [
+                    { name: 'Dave Wilson', job: 'Clothing', shift: '10:00AM-2:00PM' }
+                ]
+            }
         ]);
     });
 });

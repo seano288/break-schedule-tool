@@ -2,11 +2,13 @@ import { randomUUID } from 'node:crypto';
 import * as XLSX from 'xlsx';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { TableStorageFacade } from '../facades/TableStorageFacade.js';
+import { DEFAULT_HOURS_BY_DAY, DEFAULT_ADVANCED_SETTINGS } from '../core/constants.js';
 import { TEST_TABLE_CONNECTION_STRING } from '../../tests/testTableConnection.js';
 import { fakeRequest } from '../../tests/fakeRequest.js';
 import { wizardSelectHandler } from './wizardSelect.js';
 import { wizardUploadHandler } from './wizardUpload.js';
 import { wizardReviewHandler } from './wizardReview.js';
+import { wizardCalculateHandler } from './wizardCalculate.js';
 
 // These handlers resolve TABLE_STORAGE_CONNECTION_STRING via getFacade() — set in
 // vitest.config.js to point at the same test Azurite instance as this seeding facade.
@@ -23,6 +25,21 @@ const VALID_SCHEDULE_ROWS = [
     [null, 'Clothing', 'Wilson, Dave', '10:00AM-2:00PM']
 ];
 
+// Shaped like a real UKG export: an early decorative "Dept/Job/Name" line (row 2), then
+// the real column-header row (row 6) with a shift-label column D that the calculate
+// step's deleteColumnD strips before scheduling — see scheduleCalculation.test.js.
+const CALCULATE_SCHEDULE_ROWS = [
+    ['Date: 2024-01-15'],
+    ['Location: Test Store'],
+    ['Dept', 'Job', 'Name'],
+    [], [], [],
+    ['Dept', 'Job', 'Name', 'Shift Label', 'Shift', '15', '30', '15'],
+    ['Cashier', null, null, null, null],
+    [null, 'Cashier', 'Smith, Alice', 'x', '8:00AM-4:30PM'],
+    ['Clothing', null, null, null, null],
+    [null, 'Clothing', 'Wilson, Dave', 'x', '10:00AM-2:00PM']
+];
+
 function scheduleFile(rows = VALID_SCHEDULE_ROWS, name = 'schedule.xlsx') {
     const workbook = XLSX.utils.book_new();
     const sheet = XLSX.utils.aoa_to_sheet(rows);
@@ -37,6 +54,17 @@ function formDataWith(fields) {
         if (value !== undefined) form.append(key, value);
     }
     return form;
+}
+
+/** Pulls a hidden field's HTML-escaped value back out of a rendered wizard page. */
+function hiddenFieldValue(html, name) {
+    const match = html.match(new RegExp(`name="${name}" value="([^"]*)"`));
+    return match[1]
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', '\'');
 }
 
 describe('wizard endpoints', () => {
@@ -290,6 +318,155 @@ describe('wizard endpoints', () => {
             expect(response.body).toContain('Alice Smith');
             // The scheduleData hidden field is HTML-escaped JSON containing the parsed rows.
             expect(response.body).toMatch(/name="scheduleData" value="[^"]*Cashier[^"]*"/);
+        });
+    });
+
+    describe('POST /api/wizard/calculate', () => {
+        function calculateFormData(overrides = {}) {
+            return formDataWith({
+                locationId: 'x',
+                scheduleData: JSON.stringify([{ date: '2024-01-15', rows: CALCULATE_SCHEDULE_ROWS }]),
+                ...overrides
+            });
+        }
+
+        it('401s when unauthenticated', async () => {
+            const response = await wizardCalculateHandler(fakeRequest({ method: 'POST', formData: calculateFormData() }));
+            expect(response.status).toBe(401);
+        });
+
+        it('redirects to onboarding for an identity with no Company link', async () => {
+            const response = await wizardCalculateHandler(fakeRequest({
+                method: 'POST', principal: principalFor(randomUUID()), formData: calculateFormData()
+            }));
+            expect(response.status).toBe(303);
+            expect(response.headers.location).toBe('/api/onboarding');
+        });
+
+        it('404s for a Location id belonging to a different Company', async () => {
+            const companyA = await seedCompany();
+            const companyB = await seedCompany();
+            const userId = await seedAdmin(companyA.id);
+            const foreignLocation = await seedLocation(companyB.id);
+
+            const response = await wizardCalculateHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(userId),
+                formData: calculateFormData({ locationId: foreignLocation.id })
+            }));
+
+            expect(response.status).toBe(404);
+        });
+
+        it('403s for a Manager scoped to a different Location in the same Company', async () => {
+            const company = await seedCompany();
+            const locationX = await seedLocation(company.id, { name: 'X' });
+            const locationY = await seedLocation(company.id, { name: 'Y' });
+            const userId = await seedManager(company.id, [locationX.id]);
+
+            const response = await wizardCalculateHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(userId),
+                formData: calculateFormData({ locationId: locationY.id })
+            }));
+
+            expect(response.status).toBe(403);
+        });
+
+        it('re-renders the upload form with a clear error when scheduleData is missing or malformed', async () => {
+            const company = await seedCompany();
+            const location = await seedLocation(company.id, { name: 'Downtown Store' });
+            const userId = await seedAdmin(company.id);
+
+            const response = await wizardCalculateHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(userId),
+                formData: formDataWith({ locationId: location.id, scheduleData: 'not json' })
+            }));
+
+            expect(response.status).toBe(400);
+            expect(response.body).toContain('upload your file again');
+        });
+
+        it('rejects a day date that is not a plain YYYY-MM-DD string', async () => {
+            const company = await seedCompany();
+            const location = await seedLocation(company.id, { name: 'Downtown Store' });
+            const userId = await seedAdmin(company.id);
+
+            // A date shape check closes off Content-Disposition header injection via a
+            // hand-crafted scheduleData payload, since `date` ends up in the filename.
+            const response = await wizardCalculateHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(userId),
+                formData: calculateFormData({
+                    locationId: location.id,
+                    scheduleData: JSON.stringify([{ date: '2024-01-15"\r\nX-Injected: yes', rows: CALCULATE_SCHEDULE_ROWS }])
+                })
+            }));
+
+            expect(response.status).toBe(400);
+            expect(response.body).toContain('upload your file again');
+        });
+
+        it('streams back a completed, formatted .xlsx with breaks computed via the Location\'s coverage groups/hours/ruleset', async () => {
+            const company = await seedCompany();
+            const location = await seedLocation(company.id, {
+                name: 'Downtown Store',
+                settings: { jurisdiction: 'california', hoursByDay: DEFAULT_HOURS_BY_DAY, advanced: DEFAULT_ADVANCED_SETTINGS }
+            });
+            const userId = await seedAdmin(company.id);
+
+            const response = await wizardCalculateHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(userId),
+                formData: calculateFormData({ locationId: location.id })
+            }));
+
+            expect(response.status).toBe(200);
+            expect(response.headers['content-type']).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            expect(response.headers['content-disposition']).toBe('attachment; filename="Break Schedule 2024-01-15.xlsx"');
+
+            const workbook = XLSX.read(response.body, { type: 'buffer' });
+            const rows = XLSX.utils.sheet_to_json(workbook.Sheets.Schedule, { header: 1, defval: '' });
+
+            // Shift-label column stripped; real header row (past the decorative row 2 line) intact.
+            expect(rows[6].slice(0, 7)).toEqual(['Dept', 'Job', 'Name', 'Shift', '15', '30', '15']);
+            // Alice's 8.5h shift earns a meal + two rest breaks.
+            const aliceRow = rows[8];
+            expect(aliceRow[3]).toBe('8:00AM-4:30PM');
+            expect(aliceRow[4]).not.toBe('');
+            expect(aliceRow[5]).not.toBe('');
+            expect(aliceRow[6]).not.toBe('');
+        });
+
+        it('carries a real review-step scheduleData hand-off through to a downloadable workbook', async () => {
+            const company = await seedCompany();
+            const location = await seedLocation(company.id, {
+                name: 'Downtown Store',
+                settings: { jurisdiction: 'california', hoursByDay: DEFAULT_HOURS_BY_DAY, advanced: DEFAULT_ADVANCED_SETTINGS }
+            });
+            const userId = await seedAdmin(company.id);
+
+            const reviewResponse = await wizardReviewHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(userId),
+                formData: formDataWith({ locationId: location.id, file: scheduleFile(CALCULATE_SCHEDULE_ROWS) })
+            }));
+            expect(reviewResponse.status).toBe(200);
+
+            const scheduleData = hiddenFieldValue(reviewResponse.body, 'scheduleData');
+
+            const calculateResponse = await wizardCalculateHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(userId),
+                formData: formDataWith({ locationId: location.id, scheduleData })
+            }));
+
+            expect(calculateResponse.status).toBe(200);
+            const workbook = XLSX.read(calculateResponse.body, { type: 'buffer' });
+            const rows = XLSX.utils.sheet_to_json(workbook.Sheets.Schedule, { header: 1, defval: '' });
+            expect(rows[8][3]).toBe('8:00AM-4:30PM');
+            expect(rows[8][4]).not.toBe('');
         });
     });
 });
