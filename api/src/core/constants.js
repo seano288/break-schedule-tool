@@ -1,4 +1,3 @@
-// Mirrors src/core/constants.js (project root) unchanged — duplicated because api/ is deployed standalone (see api/src/lib/defaultTemplate.js's note).
 /**
  * Default coverage optimization groups. Only departments that share staff
  * across subdepts get pre-grouped; everything else stays standalone and the

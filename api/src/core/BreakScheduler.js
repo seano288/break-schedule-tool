@@ -1,4 +1,3 @@
-// Mirrors src/core/BreakScheduler.js (project root) unchanged — duplicated because api/ is deployed standalone (see api/src/lib/defaultTemplate.js's note).
 import { DEFAULT_GROUPS, DEFAULT_ADVANCED_SETTINGS, DEFAULT_OPERATING_HOURS } from './constants.js';
 import { formatName, parseShiftInterval, findGroupContaining } from './helpers.js';
 import { minutesToTime } from './helpers.js';

@@ -5,17 +5,9 @@ import globals from 'globals';
 export default [
     js.configs.recommended,
     security.configs.recommended,
-    // Source files run in a browser — declare browser globals so ESLint
-    // doesn't flag document, window, localStorage, etc. as undefined.
+    // Everything here runs in Node — all of api/ (an Azure Functions app) plus its tests.
     {
-        files: ['src/**/*.js'],
-        languageOptions: {
-            globals: globals.browser
-        }
-    },
-    // Test files run in Node via Vitest, as does all of api/ (an Azure Functions app).
-    {
-        files: ['tests/**/*.js', 'api/src/**/*.js', 'api/tests/**/*.js'],
+        files: ['api/src/**/*.js', 'api/tests/**/*.js'],
         languageOptions: {
             globals: globals.node
         }

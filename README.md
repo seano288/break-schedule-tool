@@ -22,7 +22,7 @@ It started as a quick Excel macro, then grew into a fully client-side web app (M
 | **Frontend** | `web/` | Static site deployed to Azure Static Web Apps. Authentication (Entra ID) and route protection are handled by SWA itself via `web/staticwebapp.config.json` — the app has no login code of its own. |
 | **API** | `api/` | Azure Functions (Node 20), one function per endpoint under `api/src/functions/`. Deployed as SWA's managed API, so it shares the frontend's auth: every `/api/*` request arrives with the caller's identity already resolved into an `x-ms-client-principal` header. |
 | **Storage** | Azure Table Storage | Companies, Locations, Users, coverage groups, and settings. Accessed only through `api/src/facades/TableStorageFacade.js`. |
-| **Scheduling engine** | `api/src/core/` (+ `src/core/` at the repo root) | The pure break/meal calculation logic — no DOM, no HTTP, fully unit-testable. `api/` deploys standalone, so it keeps its own copy rather than importing across the SWA/Functions boundary; each file that's duplicated says so in a header comment. The root copy is kept in sync and covered by `tests/core/`. |
+| **Scheduling engine** | `api/src/core/` | The pure break/meal calculation logic — no DOM, no HTTP, fully unit-testable. Covered by `api/tests/core/`. |
 | **Deployment** | `azd` (`azure.yaml`, `infra/`) | `azd up` provisions the Static Web App, storage account, and supporting infra from the Bicep templates in `infra/`, and deploys `web/` (with `api/` bundled in as its managed API, per `web/swa-cli.config.json`). |
 
 ### Multi-tenancy model
@@ -72,9 +72,8 @@ npm run tracer:web       # SWA CLI, proxies the API and emulates SWA auth
 ### Testing and linting
 
 ```bash
-npm test                 # Vitest — scheduling engine unit tests (tests/core/)
-npm --prefix api test    # Vitest — API unit/integration tests (api/src/**/*.test.js)
-npm run lint              # ESLint (with eslint-plugin-security) across src/ and api/
+npm test                 # Vitest — scheduling engine + API unit/integration tests (api/src/**/*.test.js)
+npm run lint              # ESLint (with eslint-plugin-security) across api/
 ```
 
 ### Deployment
@@ -126,7 +125,7 @@ Break placement uses net worked time, not wall-clock offsets. Each break is plac
 | **Azure Functions** (Node 20) | API |
 | **Azure Table Storage** | Company/Location/User/settings persistence |
 | **azd** / **Bicep** (`infra/`) | Infrastructure provisioning and deployment |
-| **Vitest** | Unit testing, both at the repo root (scheduling engine) and in `api/` |
+| **Vitest** | Unit testing, all under `api/` (scheduling engine included) |
 | **ESLint** + **eslint-plugin-security** | Static analysis |
 | **xlsx (SheetJS)** | Excel file parsing and generation |
 | **Azurite** / **Azure Functions Core Tools** / **SWA CLI** | Local emulation for development (`npm run tracer:dev`) |

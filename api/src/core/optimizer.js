@@ -1,4 +1,3 @@
-// Mirrors src/core/optimizer.js (project root) unchanged — duplicated because api/ is deployed standalone (see api/src/lib/defaultTemplate.js's note).
 import { calculateCoverageMap } from './coverage.js';
 import { minutesToTime, findGroupContaining } from './helpers.js';
 

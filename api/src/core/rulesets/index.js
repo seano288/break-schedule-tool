@@ -1,4 +1,3 @@
-// Mirrors src/core/rulesets/index.js (project root) unchanged — duplicated because api/ is deployed standalone (see api/src/lib/defaultTemplate.js's note).
 import { california } from './california.js';
 
 /**

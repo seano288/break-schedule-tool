@@ -1,4 +1,3 @@
-// Mirrors src/core/EmployeeSchedule.js (project root) unchanged — duplicated because api/ is deployed standalone (see api/src/lib/defaultTemplate.js's note).
 import { SPLIT_SHIFT_GAP_THRESHOLD } from './constants.js';
 import { DEFAULT_RULESET } from './rulesets/index.js';
 

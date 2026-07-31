@@ -1,4 +1,3 @@
-// Mirrors src/core/rulesets/california.js (project root) unchanged — duplicated because api/ is deployed standalone (see api/src/lib/defaultTemplate.js's note).
 /**
  * California meal/rest-break ruleset (IWC Wage Orders, DLSE enforcement policy).
  *

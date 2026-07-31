@@ -1,4 +1,3 @@
-// Mirrors src/core/coverage.js (project root) unchanged — duplicated because api/ is deployed standalone (see api/src/lib/defaultTemplate.js's note).
 import { findGroupContaining } from './helpers.js';
 
 /**

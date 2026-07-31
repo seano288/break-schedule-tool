@@ -1,4 +1,3 @@
-// Mirrors src/core/helpers.js (project root) unchanged — duplicated because api/ is deployed standalone (see api/src/lib/defaultTemplate.js's note).
 /**
  * Convert a time string to minutes since midnight.
  * Accepts 12-hour format ("2:30PM", "12:00AM") or 24-hour format ("14:30", "09:00").
