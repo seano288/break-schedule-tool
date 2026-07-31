@@ -75,10 +75,10 @@ export class TableStorageFacade {
     // -------------------------------------------------------------------------
 
     /**
-     * @param {{ userId: string, companyId: string, role: string, locationIds: string[], createdAt: string }} link
+     * @param {{ userId: string, companyId: string, role: string, locationIds: string[], userDetails?: string, createdAt: string }} link
      * @throws {EntityExistsError} if this identity is already linked to a Company
      */
-    async createUserLink({ userId, companyId, role, locationIds, createdAt }) {
+    async createUserLink({ userId, companyId, role, locationIds, userDetails, createdAt }) {
         try {
             await this._userLinks.createEntity({
                 partitionKey: userId,
@@ -86,6 +86,7 @@ export class TableStorageFacade {
                 companyId,
                 role,
                 locationIds: JSON.stringify(locationIds),
+                userDetails: userDetails ?? null,
                 createdAt
             });
         } catch (err) {
@@ -94,7 +95,7 @@ export class TableStorageFacade {
             }
             throw err;
         }
-        return { userId, companyId, role, locationIds, createdAt };
+        return { userId, companyId, role, locationIds, userDetails: userDetails ?? null, createdAt };
     }
 
     /**
@@ -105,13 +106,40 @@ export class TableStorageFacade {
     async getUserLink(userId) {
         const entity = await getEntityOrNull(() => this._userLinks.getEntity(userId, 'link'));
         if (!entity) return null;
-        return {
-            userId: entity.partitionKey,
-            companyId: entity.companyId,
-            role: entity.role,
-            locationIds: JSON.parse(entity.locationIds),
-            createdAt: entity.createdAt
-        };
+        return mapUserLinkEntity(entity);
+    }
+
+    /**
+     * Lists every UserLink under a Company. UserLink is partitioned by userId (see class
+     * doc comment), so this scans the whole table rather than a single partition — acceptable
+     * for this admin-only, low-frequency listing rather than a hot point-read path.
+     * @param {string} companyId
+     * @returns {Promise<object[]>}
+     */
+    async listUserLinksByCompany(companyId) {
+        const links = [];
+        for await (const entity of this._userLinks.listEntities({
+            queryOptions: { filter: odata`companyId eq ${companyId}` }
+        })) {
+            links.push(mapUserLinkEntity(entity));
+        }
+        return links;
+    }
+
+    /**
+     * @param {string} userId
+     * @param {string} role
+     */
+    async updateUserLinkRole(userId, role) {
+        await this._userLinks.updateEntity({ partitionKey: userId, rowKey: 'link', role }, 'Merge');
+    }
+
+    /**
+     * Removes a UserLink, immediately revoking that identity's access to its Company.
+     * @param {string} userId
+     */
+    async deleteUserLink(userId) {
+        await this._userLinks.deleteEntity(userId, 'link');
     }
 
     // -------------------------------------------------------------------------
@@ -313,6 +341,17 @@ async function getEntityOrNull(read) {
         if (err.statusCode === 404) return null;
         throw err;
     }
+}
+
+function mapUserLinkEntity(entity) {
+    return {
+        userId: entity.partitionKey,
+        companyId: entity.companyId,
+        role: entity.role,
+        locationIds: JSON.parse(entity.locationIds),
+        userDetails: entity.userDetails ?? null,
+        createdAt: entity.createdAt
+    };
 }
 
 function mapInviteEntity(entity) {

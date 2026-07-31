@@ -13,7 +13,11 @@ export async function onboardingRedeemInviteHandler(request) {
     const form = new URLSearchParams(await request.text());
     const facade = await getFacade();
 
-    return runOnboardingAction(() => redeemInviteForUser(facade, { userId: principal.userId, code: form.get('code') }));
+    return runOnboardingAction(() => redeemInviteForUser(facade, {
+        userId: principal.userId,
+        userDetails: principal.userDetails,
+        code: form.get('code')
+    }));
 }
 
 app.http('onboardingRedeemInvite', {

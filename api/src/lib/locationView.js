@@ -9,6 +9,7 @@ export function renderLocationsPage({ role, locations, error } = {}) {
         <h1>Locations</h1>
         ${error ? `<p class="error">${escapeHtml(error)}</p>` : ''}
         ${role === 'Admin' ? '<p><a href="/api/company/template">Edit Company default template</a></p>' : ''}
+        ${role === 'Admin' ? '<p><a href="/api/users">Manage Users</a></p>' : ''}
         ${role === 'Admin' ? renderCreateForm() : ''}
         ${renderLocationList(role, locations)}
     `);

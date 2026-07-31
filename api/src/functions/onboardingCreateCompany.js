@@ -13,7 +13,11 @@ export async function onboardingCreateCompanyHandler(request) {
     const form = new URLSearchParams(await request.text());
     const facade = await getFacade();
 
-    return runOnboardingAction(() => createCompanyForUser(facade, { userId: principal.userId, name: form.get('name') }));
+    return runOnboardingAction(() => createCompanyForUser(facade, {
+        userId: principal.userId,
+        userDetails: principal.userDetails,
+        name: form.get('name')
+    }));
 }
 
 app.http('onboardingCreateCompany', {

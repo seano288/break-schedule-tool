@@ -60,8 +60,24 @@ describe('TableStorageFacade', () => {
                 companyId,
                 role: 'Admin',
                 locationIds: [],
+                userDetails: null,
                 createdAt: '2026-07-30T00:00:00.000Z'
             });
+        });
+
+        it('stores an optional userDetails label', async () => {
+            const userId = randomUUID();
+
+            await facade.createUserLink({
+                userId,
+                companyId: randomUUID(),
+                role: 'Admin',
+                locationIds: [],
+                userDetails: 'alice@example.com',
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            expect((await facade.getUserLink(userId)).userDetails).toBe('alice@example.com');
         });
 
         it('returns null for an identity with no link', async () => {
@@ -82,6 +98,62 @@ describe('TableStorageFacade', () => {
 
             await expect(facade.createUserLink({ ...link, companyId: randomUUID() }))
                 .rejects.toThrow(EntityExistsError);
+        });
+
+        it('lists only the user links belonging to the given company', async () => {
+            const companyA = randomUUID();
+            const companyB = randomUUID();
+            const userA = randomUUID();
+            await facade.createUserLink({
+                userId: userA,
+                companyId: companyA,
+                role: 'Admin',
+                locationIds: [],
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+            await facade.createUserLink({
+                userId: randomUUID(),
+                companyId: companyB,
+                role: 'Admin',
+                locationIds: [],
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            const links = await facade.listUserLinksByCompany(companyA);
+
+            expect(links.map(l => l.userId)).toEqual([userA]);
+        });
+
+        it('updates a user link\'s role', async () => {
+            const userId = randomUUID();
+            await facade.createUserLink({
+                userId,
+                companyId: randomUUID(),
+                role: 'Manager',
+                locationIds: [],
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            await facade.updateUserLinkRole(userId, 'Admin');
+
+            expect((await facade.getUserLink(userId)).role).toBe('Admin');
+        });
+
+        it('deletes a user link, so a later lookup returns null', async () => {
+            const userId = randomUUID();
+            const companyId = randomUUID();
+            await facade.createUserLink({
+                userId,
+                companyId,
+                role: 'Admin',
+                locationIds: [],
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            await facade.deleteUserLink(userId);
+
+            expect(await facade.getUserLink(userId)).toBeNull();
+            expect(await facade.listUserLinksByCompany(companyId)).toEqual([]);
         });
     });
 

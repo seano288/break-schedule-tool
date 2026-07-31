@@ -26,9 +26,9 @@ export async function getLinkStatus(facade, userId) {
 
 /**
  * @param {import('../facades/TableStorageFacade.js').TableStorageFacade} facade
- * @param {{ userId: string, name: string }} params
+ * @param {{ userId: string, userDetails?: string, name: string }} params
  */
-export async function createCompanyForUser(facade, { userId, name }) {
+export async function createCompanyForUser(facade, { userId, userDetails, name }) {
     const trimmedName = (name || '').trim();
     if (!trimmedName) {
         throw new OnboardingError('Company name is required.', 'invalid-name');
@@ -46,16 +46,16 @@ export async function createCompanyForUser(facade, { userId, name }) {
         createdAt
     });
 
-    await linkUser(facade, { userId, companyId: company.id, role: 'Admin', locationIds: [], createdAt });
+    await linkUser(facade, { userId, userDetails, companyId: company.id, role: 'Admin', locationIds: [], createdAt });
 
     return { company, role: 'Admin' };
 }
 
 /**
  * @param {import('../facades/TableStorageFacade.js').TableStorageFacade} facade
- * @param {{ userId: string, code: string }} params
+ * @param {{ userId: string, userDetails?: string, code: string }} params
  */
-export async function redeemInviteForUser(facade, { userId, code }) {
+export async function redeemInviteForUser(facade, { userId, userDetails, code }) {
     const trimmedCode = (code || '').trim();
     if (!trimmedCode) {
         throw new OnboardingError('An invite code is required.', 'invalid-code');
@@ -86,6 +86,7 @@ export async function redeemInviteForUser(facade, { userId, code }) {
 
     await linkUser(facade, {
         userId,
+        userDetails,
         companyId: invite.companyId,
         role: invite.role,
         locationIds: invite.locationIds,
@@ -102,9 +103,9 @@ async function assertUnlinked(facade, userId) {
     }
 }
 
-async function linkUser(facade, { userId, companyId, role, locationIds, createdAt }) {
+async function linkUser(facade, { userId, userDetails, companyId, role, locationIds, createdAt }) {
     try {
-        await facade.createUserLink({ userId, companyId, role, locationIds, createdAt });
+        await facade.createUserLink({ userId, userDetails, companyId, role, locationIds, createdAt });
     } catch (err) {
         if (err instanceof EntityExistsError) {
             throw new OnboardingError('This identity is already linked to a Company.', 'already-linked');

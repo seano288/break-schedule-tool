@@ -35,6 +35,14 @@ describe('onboardingService', () => {
             expect(status).toEqual({ linked: true, role: 'Admin', company: result.company });
         });
 
+        it('records the creator\'s userDetails on the UserLink', async () => {
+            const userId = randomUUID();
+
+            await createCompanyForUser(facade, { userId, userDetails: 'alice@example.com', name: 'Acme Outfitters' });
+
+            expect((await facade.getUserLink(userId)).userDetails).toBe('alice@example.com');
+        });
+
         it('rejects an empty company name', async () => {
             await expect(createCompanyForUser(facade, { userId: randomUUID(), name: '   ' }))
                 .rejects.toMatchObject({ reason: 'invalid-name' });
@@ -102,6 +110,15 @@ describe('onboardingService', () => {
             const invite = await facade.getInviteCode(code);
             expect(invite.used).toBe(true);
             expect(invite.usedBy).toBe(userId);
+        });
+
+        it('records the redeemer\'s userDetails on the UserLink', async () => {
+            const code = await seedInvite();
+            const userId = randomUUID();
+
+            await redeemInviteForUser(facade, { userId, userDetails: 'bob@example.com', code });
+
+            expect((await facade.getUserLink(userId)).userDetails).toBe('bob@example.com');
         });
 
         it('fails clearly for an unknown code', async () => {
