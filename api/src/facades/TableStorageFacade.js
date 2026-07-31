@@ -238,6 +238,52 @@ export class TableStorageFacade {
     async archiveLocation(companyId, locationId) {
         await this._locations.updateEntity({ partitionKey: companyId, rowKey: locationId, archived: true }, 'Merge');
     }
+
+    /**
+     * @param {string} companyId
+     * @param {string} locationId
+     * @param {Array} coverageGroups
+     */
+    async updateLocationCoverageGroups(companyId, locationId, coverageGroups) {
+        await this._locations.updateEntity(
+            { partitionKey: companyId, rowKey: locationId, coverageGroups: JSON.stringify(coverageGroups) },
+            'Merge'
+        );
+    }
+
+    /**
+     * @param {string} companyId
+     * @param {string} locationId
+     * @param {object} settings
+     */
+    async updateLocationSettings(companyId, locationId, settings) {
+        await this._locations.updateEntity(
+            { partitionKey: companyId, rowKey: locationId, settings: JSON.stringify(settings) },
+            'Merge'
+        );
+    }
+
+    /**
+     * @param {string} companyId
+     * @param {Array} coverageGroups
+     */
+    async updateCompanyDefaultCoverageGroups(companyId, coverageGroups) {
+        await this._companies.updateEntity(
+            { partitionKey: companyId, rowKey: 'profile', defaultCoverageGroups: JSON.stringify(coverageGroups) },
+            'Merge'
+        );
+    }
+
+    /**
+     * @param {string} companyId
+     * @param {object} settings
+     */
+    async updateCompanyDefaultSettings(companyId, settings) {
+        await this._companies.updateEntity(
+            { partitionKey: companyId, rowKey: 'profile', defaultSettings: JSON.stringify(settings) },
+            'Merge'
+        );
+    }
 }
 
 // -------------------------------------------------------------------------

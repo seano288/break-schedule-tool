@@ -8,6 +8,7 @@ export function renderLocationsPage({ role, locations, error } = {}) {
     return page(`
         <h1>Locations</h1>
         ${error ? `<p class="error">${escapeHtml(error)}</p>` : ''}
+        ${role === 'Admin' ? '<p><a href="/api/company/template">Edit Company default template</a></p>' : ''}
         ${role === 'Admin' ? renderCreateForm() : ''}
         ${renderLocationList(role, locations)}
     `);
@@ -35,13 +36,15 @@ function renderLocationList(role, locations) {
 
 function renderLocationItem(role, location) {
     const status = location.archived ? ' (Archived)' : '';
+    const editLink = `<a href="/api/locations/edit?id=${encodeURIComponent(location.id)}">Manage coverage groups &amp; hours</a>`;
     if (role !== 'Admin') {
-        return `<li>${escapeHtml(location.name)}</li>`;
+        return `<li>${escapeHtml(location.name)} ${editLink}</li>`;
     }
 
     return `
         <li>
             ${escapeHtml(location.name)}${status}
+            ${editLink}
             <form method="post" action="/api/locations/rename">
                 <input type="hidden" name="id" value="${escapeHtml(location.id)}">
                 <input type="text" name="name" value="${escapeHtml(location.name)}" required>

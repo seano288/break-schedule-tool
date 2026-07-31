@@ -264,5 +264,137 @@ describe('TableStorageFacade', () => {
             const found = await facade.getLocation(companyId, id);
             expect(found.archived).toBe(true);
         });
+
+        it('updates a location\'s coverage groups, leaving its settings untouched', async () => {
+            const companyId = randomUUID();
+            const id = randomUUID();
+            await facade.createLocation({
+                id,
+                companyId,
+                name: 'Downtown',
+                coverageGroups: [],
+                settings: { hoursByDay: {}, advanced: {} },
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            const newGroups = [{ id: 1, name: 'Cashier', departments: [{ main: 'Front', sub: 'Cashier' }] }];
+            await facade.updateLocationCoverageGroups(companyId, id, newGroups);
+
+            const found = await facade.getLocation(companyId, id);
+            expect(found.coverageGroups).toEqual(newGroups);
+            expect(found.settings).toEqual({ hoursByDay: {}, advanced: {} });
+        });
+
+        it('updates a location\'s settings, leaving its coverage groups untouched', async () => {
+            const companyId = randomUUID();
+            const id = randomUUID();
+            const groups = [{ id: 1, name: 'Cashier', departments: [] }];
+            await facade.createLocation({
+                id,
+                companyId,
+                name: 'Downtown',
+                coverageGroups: groups,
+                settings: { hoursByDay: {}, advanced: {} },
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            const newSettings = { hoursByDay: { monday: { start: '09:00', end: '17:00' } }, advanced: {} };
+            await facade.updateLocationSettings(companyId, id, newSettings);
+
+            const found = await facade.getLocation(companyId, id);
+            expect(found.settings).toEqual(newSettings);
+            expect(found.coverageGroups).toEqual(groups);
+        });
+
+        it('updating one location never affects another', async () => {
+            const companyId = randomUUID();
+            const locationA = await facade.createLocation({
+                id: randomUUID(),
+                companyId,
+                name: 'A Store',
+                coverageGroups: [{ id: 1, name: 'Original', departments: [] }],
+                settings: { hoursByDay: {}, advanced: {} },
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+            const locationB = await facade.createLocation({
+                id: randomUUID(),
+                companyId,
+                name: 'B Store',
+                coverageGroups: [{ id: 1, name: 'Original', departments: [] }],
+                settings: { hoursByDay: {}, advanced: {} },
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            await facade.updateLocationCoverageGroups(companyId, locationA.id, [{ id: 1, name: 'Changed', departments: [] }]);
+
+            const foundB = await facade.getLocation(companyId, locationB.id);
+            expect(foundB.coverageGroups).toEqual([{ id: 1, name: 'Original', departments: [] }]);
+        });
+    });
+
+    describe('company default template', () => {
+        it('updates the default coverage groups, leaving default settings untouched', async () => {
+            const id = randomUUID();
+            await facade.createCompany({
+                id,
+                name: 'Acme Outfitters',
+                subscriptionStatus: 'trial',
+                defaultCoverageGroups: [],
+                defaultSettings: { hoursByDay: {}, advanced: {} },
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            const newGroups = [{ id: 1, name: 'Cashier', departments: [] }];
+            await facade.updateCompanyDefaultCoverageGroups(id, newGroups);
+
+            const found = await facade.getCompany(id);
+            expect(found.defaultCoverageGroups).toEqual(newGroups);
+            expect(found.defaultSettings).toEqual({ hoursByDay: {}, advanced: {} });
+        });
+
+        it('updates the default settings, leaving default coverage groups untouched', async () => {
+            const id = randomUUID();
+            const groups = [{ id: 1, name: 'Cashier', departments: [] }];
+            await facade.createCompany({
+                id,
+                name: 'Acme Outfitters',
+                subscriptionStatus: 'trial',
+                defaultCoverageGroups: groups,
+                defaultSettings: { hoursByDay: {}, advanced: {} },
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            const newSettings = { hoursByDay: { monday: { start: '09:00', end: '17:00' } }, advanced: {} };
+            await facade.updateCompanyDefaultSettings(id, newSettings);
+
+            const found = await facade.getCompany(id);
+            expect(found.defaultSettings).toEqual(newSettings);
+            expect(found.defaultCoverageGroups).toEqual(groups);
+        });
+
+        it('does not affect an existing Location when the Company template changes later', async () => {
+            const companyId = randomUUID();
+            await facade.createCompany({
+                id: companyId,
+                name: 'Acme Outfitters',
+                subscriptionStatus: 'trial',
+                defaultCoverageGroups: [{ id: 1, name: 'Original', departments: [] }],
+                defaultSettings: { hoursByDay: {}, advanced: {} },
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+            const location = await facade.createLocation({
+                id: randomUUID(),
+                companyId,
+                name: 'Downtown',
+                coverageGroups: [{ id: 1, name: 'Original', departments: [] }],
+                settings: { hoursByDay: {}, advanced: {} },
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            await facade.updateCompanyDefaultCoverageGroups(companyId, [{ id: 1, name: 'Changed', departments: [] }]);
+
+            const found = await facade.getLocation(companyId, location.id);
+            expect(found.coverageGroups).toEqual([{ id: 1, name: 'Original', departments: [] }]);
+        });
     });
 });
