@@ -3,7 +3,7 @@ export function encodePrincipal(principal) {
     return Buffer.from(JSON.stringify(principal), 'utf-8').toString('base64');
 }
 
-export function fakeRequest({ method = 'GET', principal, body = '', query = {} } = {}) {
+export function fakeRequest({ method = 'GET', principal, body = '', query = {}, formData } = {}) {
     const headerMap = new Map();
     if (principal) {
         headerMap.set('x-ms-client-principal', encodePrincipal(principal));
@@ -12,6 +12,7 @@ export function fakeRequest({ method = 'GET', principal, body = '', query = {} }
         method,
         headers: { get: (name) => headerMap.get(name) ?? null },
         query: new URLSearchParams(query),
-        text: async () => body
+        text: async () => body,
+        formData: async () => formData
     };
 }
