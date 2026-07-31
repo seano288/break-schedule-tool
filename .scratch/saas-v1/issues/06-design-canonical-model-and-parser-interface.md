@@ -4,6 +4,8 @@ Type: prototype
 Status: open
 Blocked by: 01
 
+> **Constraint from [#05 IP-cut-line](05-draw-ip-protection-cut-line.md):** the parser runs **server-side**, and the canonical model is a **server-internal seam — NOT the API/wire contract** (the wire input is the raw file + preset id + settings; the client ships no parser and no `core/`). The pluggable-parser goal still holds server-side: the v1 variant is the **UKG preset** (B-preset), and the interface must leave room for interactive per-file mapping (B-map, v2) and future API parsers. Validation/rejection happens server-side, and unmatched files must be **rejected loudly**, never silently mis-parsed.
+
 ## Question
 
 What is the canonical internal schedule model, and what is the parser interface that normalizes any input format into it?
