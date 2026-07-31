@@ -1,4 +1,4 @@
-import { TableClient } from '@azure/data-tables';
+import { odata, TableClient } from '@azure/data-tables';
 
 /**
  * TableStorageFacade — abstracts Azure Table Storage access.
@@ -11,7 +11,9 @@ import { TableClient } from '@azure/data-tables';
  * id). UserLink and InviteCode are partitioned by their lookup key (userId,
  * the literal invite code) rather than by owning Company, since every request
  * resolves "this identity" or "this code" — not "this company's users" — and
- * that resolution must be a point read, not a company-scoped scan.
+ * that resolution must be a point read, not a company-scoped scan. Location is
+ * partitioned by its owning companyId instead, since "every Location under my
+ * Company" (an Admin's list) is the dominant access pattern for that entity.
  */
 export class TableStorageFacade {
     /** @param {string} connectionString */
@@ -20,12 +22,13 @@ export class TableStorageFacade {
         this._companies = TableClient.fromConnectionString(connectionString, 'companies', options);
         this._userLinks = TableClient.fromConnectionString(connectionString, 'userLinks', options);
         this._inviteCodes = TableClient.fromConnectionString(connectionString, 'inviteCodes', options);
+        this._locations = TableClient.fromConnectionString(connectionString, 'locations', options);
     }
 
     /** Ensure all backing tables exist. Safe to call repeatedly. */
     async init() {
         await Promise.all(
-            [this._companies, this._userLinks, this._inviteCodes].map(createTableIfNotExists)
+            [this._companies, this._userLinks, this._inviteCodes, this._locations].map(createTableIfNotExists)
         );
     }
 
@@ -171,6 +174,70 @@ export class TableStorageFacade {
             throw err;
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Locations
+    // -------------------------------------------------------------------------
+
+    /**
+     * @param {{ id: string, companyId: string, name: string, coverageGroups: Array, settings: object, createdAt: string }} location
+     */
+    async createLocation({ id, companyId, name, coverageGroups, settings, createdAt }) {
+        await this._locations.createEntity({
+            partitionKey: companyId,
+            rowKey: id,
+            name,
+            archived: false,
+            coverageGroups: JSON.stringify(coverageGroups),
+            settings: JSON.stringify(settings),
+            createdAt
+        });
+        return { id, companyId, name, archived: false, coverageGroups, settings, createdAt };
+    }
+
+    /**
+     * Looks up a Location by id, scoped to its owning Company.
+     * @param {string} companyId
+     * @param {string} locationId
+     * @returns {Promise<object|null>} null if no Location with that id exists under this Company
+     */
+    async getLocation(companyId, locationId) {
+        const entity = await getEntityOrNull(() => this._locations.getEntity(companyId, locationId));
+        if (!entity) return null;
+        return mapLocationEntity(entity);
+    }
+
+    /**
+     * Lists every Location under a Company (including archived ones).
+     * @param {string} companyId
+     * @returns {Promise<object[]>}
+     */
+    async listLocationsByCompany(companyId) {
+        const locations = [];
+        for await (const entity of this._locations.listEntities({
+            queryOptions: { filter: odata`PartitionKey eq ${companyId}` }
+        })) {
+            locations.push(mapLocationEntity(entity));
+        }
+        return locations;
+    }
+
+    /**
+     * @param {string} companyId
+     * @param {string} locationId
+     * @param {string} name
+     */
+    async renameLocation(companyId, locationId, name) {
+        await this._locations.updateEntity({ partitionKey: companyId, rowKey: locationId, name }, 'Merge');
+    }
+
+    /**
+     * @param {string} companyId
+     * @param {string} locationId
+     */
+    async archiveLocation(companyId, locationId) {
+        await this._locations.updateEntity({ partitionKey: companyId, rowKey: locationId, archived: true }, 'Merge');
+    }
 }
 
 // -------------------------------------------------------------------------
@@ -212,6 +279,18 @@ function mapInviteEntity(entity) {
         used: entity.used,
         usedBy: entity.usedBy ?? null,
         usedAt: entity.usedAt ?? null,
+        createdAt: entity.createdAt
+    };
+}
+
+function mapLocationEntity(entity) {
+    return {
+        id: entity.rowKey,
+        companyId: entity.partitionKey,
+        name: entity.name,
+        archived: entity.archived,
+        coverageGroups: JSON.parse(entity.coverageGroups),
+        settings: JSON.parse(entity.settings),
         createdAt: entity.createdAt
     };
 }

@@ -158,4 +158,111 @@ describe('TableStorageFacade', () => {
             expect(rejected[0].reason).toBeInstanceOf(ConflictError);
         });
     });
+
+    describe('locations', () => {
+        it('creates and reads back a location, round-tripping JSON fields', async () => {
+            const companyId = randomUUID();
+            const id = randomUUID();
+
+            const created = await facade.createLocation({
+                id,
+                companyId,
+                name: 'Downtown',
+                coverageGroups: [{ id: 1, name: 'Cashier', departments: [] }],
+                settings: { hoursByDay: {}, advanced: {} },
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            expect(created).toEqual({
+                id,
+                companyId,
+                name: 'Downtown',
+                archived: false,
+                coverageGroups: [{ id: 1, name: 'Cashier', departments: [] }],
+                settings: { hoursByDay: {}, advanced: {} },
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            expect(await facade.getLocation(companyId, id)).toEqual(created);
+        });
+
+        it('returns null for an unknown location', async () => {
+            expect(await facade.getLocation(randomUUID(), randomUUID())).toBeNull();
+        });
+
+        it('returns null when the location id belongs to a different company', async () => {
+            const companyId = randomUUID();
+            const id = randomUUID();
+            await facade.createLocation({
+                id,
+                companyId,
+                name: 'Downtown',
+                coverageGroups: [],
+                settings: {},
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            expect(await facade.getLocation(randomUUID(), id)).toBeNull();
+        });
+
+        it('lists only the locations belonging to the given company', async () => {
+            const companyA = randomUUID();
+            const companyB = randomUUID();
+            const locationA = await facade.createLocation({
+                id: randomUUID(),
+                companyId: companyA,
+                name: 'A Store',
+                coverageGroups: [],
+                settings: {},
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+            await facade.createLocation({
+                id: randomUUID(),
+                companyId: companyB,
+                name: 'B Store',
+                coverageGroups: [],
+                settings: {},
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            const locations = await facade.listLocationsByCompany(companyA);
+            expect(locations).toEqual([locationA]);
+        });
+
+        it('renames a location', async () => {
+            const companyId = randomUUID();
+            const id = randomUUID();
+            await facade.createLocation({
+                id,
+                companyId,
+                name: 'Old Name',
+                coverageGroups: [],
+                settings: {},
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            await facade.renameLocation(companyId, id, 'New Name');
+
+            const found = await facade.getLocation(companyId, id);
+            expect(found.name).toBe('New Name');
+        });
+
+        it('archives a location', async () => {
+            const companyId = randomUUID();
+            const id = randomUUID();
+            await facade.createLocation({
+                id,
+                companyId,
+                name: 'Downtown',
+                coverageGroups: [],
+                settings: {},
+                createdAt: '2026-07-30T00:00:00.000Z'
+            });
+
+            await facade.archiveLocation(companyId, id);
+
+            const found = await facade.getLocation(companyId, id);
+            expect(found.archived).toBe(true);
+        });
+    });
 });
