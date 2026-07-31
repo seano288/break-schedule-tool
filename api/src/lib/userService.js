@@ -1,15 +1,11 @@
 import { randomUUID } from 'node:crypto';
+import { ScopeError, assertUserBelongsToCompany } from './companyScope.js';
 
 const VALID_ROLES = ['Admin', 'Manager'];
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Thrown for expected User-management failures; `reason` lets callers render a specific message. */
-export class UserError extends Error {
-    constructor(message, reason) {
-        super(message);
-        this.reason = reason;
-    }
-}
+export class UserError extends ScopeError {}
 
 /**
  * @param {import('../facades/TableStorageFacade.js').TableStorageFacade} facade
@@ -46,7 +42,7 @@ export async function createInviteForCompany(facade, { companyId, role }) {
  */
 export async function changeUserRole(facade, { companyId, userId, role }) {
     assertValidRole(role);
-    await assertCompanyMember(facade, companyId, userId);
+    await assertUserBelongsToCompany(facade, companyId, userId);
     await facade.updateUserLinkRole(userId, role);
 }
 
@@ -59,19 +55,12 @@ export async function changeUserRole(facade, { companyId, userId, role }) {
  * @param {{ companyId: string, userId: string }} params
  */
 export async function revokeCompanyUser(facade, { companyId, userId }) {
-    await assertCompanyMember(facade, companyId, userId);
+    await assertUserBelongsToCompany(facade, companyId, userId);
     await facade.deleteUserLink(userId);
 }
 
 function assertValidRole(role) {
     if (!VALID_ROLES.includes(role)) {
         throw new UserError('Role must be Admin or Manager.', 'invalid-role');
-    }
-}
-
-async function assertCompanyMember(facade, companyId, userId) {
-    const link = await facade.getUserLink(userId);
-    if (!link || link.companyId !== companyId) {
-        throw new UserError('User not found.', 'not-found');
     }
 }

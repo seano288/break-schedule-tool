@@ -1,13 +1,10 @@
+import { assertLocationBelongsToCompany, assertViewerAssignedToLocation, ScopeError } from './companyScope.js';
+
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 /** Thrown for expected coverage-group/hours editing failures; `reason` lets callers render a specific message. */
-export class SettingsError extends Error {
-    constructor(message, reason) {
-        super(message);
-        this.reason = reason;
-    }
-}
+export class SettingsError extends ScopeError {}
 
 // -------------------------------------------------------------------------
 // Location-scoped (Manager/Admin assigned to that Location)
@@ -17,16 +14,11 @@ export class SettingsError extends Error {
  * @param {import('../facades/TableStorageFacade.js').TableStorageFacade} facade
  * @param {{ companyId: string, role: string, locationIds?: string[], locationId: string }} target
  * @returns {Promise<object>} the Location
- * @throws {SettingsError} 'not-found' or 'forbidden'
+ * @throws {ScopeError} 'not-found' or 'forbidden'
  */
 export async function assertLocationEditableByViewer(facade, { companyId, role, locationIds, locationId }) {
-    const location = await facade.getLocation(companyId, locationId);
-    if (!location) {
-        throw new SettingsError('Location not found.', 'not-found');
-    }
-    if (role !== 'Admin' && !(locationIds ?? []).includes(locationId)) {
-        throw new SettingsError('You are not assigned to this Location.', 'forbidden');
-    }
+    const location = await assertLocationBelongsToCompany(facade, companyId, locationId);
+    assertViewerAssignedToLocation(location, { role, locationIds });
     return location;
 }
 

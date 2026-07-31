@@ -1,7 +1,8 @@
 import { app } from '@azure/functions';
 import { parseClientPrincipal } from '../lib/clientPrincipal.js';
 import { getFacade } from '../lib/facadeInstance.js';
-import { SettingsError, assertLocationEditableByViewer } from '../lib/settingsService.js';
+import { assertLocationEditableByViewer } from '../lib/settingsService.js';
+import { ScopeError } from '../lib/companyScope.js';
 import { settingsErrorResponse } from '../lib/settingsHttp.js';
 import { renderLocationEditPage } from '../lib/settingsView.js';
 
@@ -22,7 +23,7 @@ export async function locationsEditHandler(request) {
     try {
         location = await assertLocationEditableByViewer(facade, { ...link, locationId });
     } catch (err) {
-        if (err instanceof SettingsError) {
+        if (err instanceof ScopeError) {
             return settingsErrorResponse(err);
         }
         throw err;

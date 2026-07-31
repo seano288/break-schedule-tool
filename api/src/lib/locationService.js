@@ -1,12 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { ScopeError, assertLocationBelongsToCompany } from './companyScope.js';
 
 /** Thrown for expected Location-management failures; `reason` lets callers render a specific message. */
-export class LocationError extends Error {
-    constructor(message, reason) {
-        super(message);
-        this.reason = reason;
-    }
-}
+export class LocationError extends ScopeError {}
 
 /**
  * @param {import('../facades/TableStorageFacade.js').TableStorageFacade} facade
@@ -47,7 +43,7 @@ export async function createLocationForCompany(facade, { companyId, name }) {
  */
 export async function renameCompanyLocation(facade, { companyId, locationId, name }) {
     const trimmedName = requireName(name);
-    await assertOwnedLocation(facade, companyId, locationId);
+    await assertLocationBelongsToCompany(facade, companyId, locationId);
     await facade.renameLocation(companyId, locationId, trimmedName);
 }
 
@@ -56,7 +52,7 @@ export async function renameCompanyLocation(facade, { companyId, locationId, nam
  * @param {{ companyId: string, locationId: string }} params
  */
 export async function archiveCompanyLocation(facade, { companyId, locationId }) {
-    await assertOwnedLocation(facade, companyId, locationId);
+    await assertLocationBelongsToCompany(facade, companyId, locationId);
     await facade.archiveLocation(companyId, locationId);
 }
 
@@ -66,12 +62,4 @@ function requireName(name) {
         throw new LocationError('Location name is required.', 'invalid-name');
     }
     return trimmed;
-}
-
-async function assertOwnedLocation(facade, companyId, locationId) {
-    const location = await facade.getLocation(companyId, locationId);
-    if (!location) {
-        throw new LocationError('Location not found.', 'not-found');
-    }
-    return location;
 }

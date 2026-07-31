@@ -1,4 +1,5 @@
-import { LocationError, listLocationsForViewer } from './locationService.js';
+import { listLocationsForViewer } from './locationService.js';
+import { ScopeError } from './companyScope.js';
 import { renderLocationsPage } from './locationView.js';
 
 const STATUS_BY_REASON = {
@@ -19,7 +20,7 @@ export async function runLocationAction(facade, link, action) {
     try {
         await action();
     } catch (err) {
-        if (err instanceof LocationError) {
+        if (err instanceof ScopeError) {
             const locations = await listLocationsForViewer(facade, link);
             return {
                 status: STATUS_BY_REASON[err.reason] ?? 400,

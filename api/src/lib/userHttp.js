@@ -1,4 +1,5 @@
-import { UserError, listUsersForCompany } from './userService.js';
+import { listUsersForCompany } from './userService.js';
+import { ScopeError } from './companyScope.js';
 import { renderUsersPage } from './userView.js';
 
 const STATUS_BY_REASON = {
@@ -19,7 +20,7 @@ export async function runUserAction(facade, link, action) {
     try {
         await action();
     } catch (err) {
-        if (err instanceof UserError) {
+        if (err instanceof ScopeError) {
             return renderUsersError(facade, link, err);
         }
         throw err;
@@ -42,7 +43,7 @@ export async function runUserInviteAction(facade, link, action) {
     try {
         invite = await action();
     } catch (err) {
-        if (err instanceof UserError) {
+        if (err instanceof ScopeError) {
             return renderUsersError(facade, link, err);
         }
         throw err;

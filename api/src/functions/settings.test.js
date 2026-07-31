@@ -117,6 +117,32 @@ describe('settings endpoints', () => {
             expect(response.status).toBe(403);
         });
 
+        it('403s for a Manager scoped to a different Location in the same Company', async () => {
+            const company = await seedCompany();
+            const locationX = await seedLocation(company.id, { name: 'X' });
+            const locationY = await seedLocation(company.id, { name: 'Y' });
+            const userId = await seedManager(company.id, [locationX.id]);
+
+            const response = await locationsEditHandler(fakeRequest({
+                principal: principalFor(userId), query: { id: locationY.id }
+            }));
+
+            expect(response.status).toBe(403);
+        });
+
+        it('404s for a Location id belonging to a different Company', async () => {
+            const companyA = await seedCompany();
+            const companyB = await seedCompany();
+            const userId = await seedAdmin(companyA.id);
+            const foreignLocation = await seedLocation(companyB.id);
+
+            const response = await locationsEditHandler(fakeRequest({
+                principal: principalFor(userId), query: { id: foreignLocation.id }
+            }));
+
+            expect(response.status).toBe(404);
+        });
+
         it('shows the Location\'s coverage groups and hours to an Admin', async () => {
             const company = await seedCompany();
             const userId = await seedAdmin(company.id);
@@ -165,6 +191,23 @@ describe('settings endpoints', () => {
             }));
 
             expect(response.status).toBe(403);
+        });
+
+        it('403s for a Manager scoped to a different Location in the same Company', async () => {
+            const company = await seedCompany();
+            const locationX = await seedLocation(company.id, { name: 'X' });
+            const locationY = await seedLocation(company.id, { name: 'Y' });
+            const userId = await seedManager(company.id, [locationX.id]);
+
+            const response = await locationsCoverageGroupsCreateHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(userId),
+                body: new URLSearchParams({ locationId: locationY.id, name: 'Cashier', departments: 'Front | Cashier' }).toString()
+            }));
+
+            expect(response.status).toBe(403);
+            const found = await seedFacade.getLocation(company.id, locationY.id);
+            expect(found.coverageGroups).toEqual([]);
         });
 
         it('404s for a Location id belonging to a different Company', async () => {
@@ -286,6 +329,26 @@ describe('settings endpoints', () => {
             const found = await seedFacade.getLocation(companyB.id, foreignLocation.id);
             expect(found.coverageGroups).toEqual([{ id: 1, name: 'Original', departments: [] }]);
         });
+
+        it('403s for a Manager scoped to a different Location in the same Company', async () => {
+            const company = await seedCompany();
+            const locationX = await seedLocation(company.id, { name: 'X' });
+            const locationY = await seedLocation(company.id, {
+                name: 'Y',
+                coverageGroups: [{ id: 1, name: 'Original', departments: [] }]
+            });
+            const userId = await seedManager(company.id, [locationX.id]);
+
+            const response = await locationsCoverageGroupsUpdateHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(userId),
+                body: new URLSearchParams({ locationId: locationY.id, id: '1', name: 'Hijacked', departments: 'A | B' }).toString()
+            }));
+
+            expect(response.status).toBe(403);
+            const found = await seedFacade.getLocation(company.id, locationY.id);
+            expect(found.coverageGroups).toEqual([{ id: 1, name: 'Original', departments: [] }]);
+        });
     });
 
     describe('POST /api/locations/coverage-groups/delete', () => {
@@ -337,6 +400,26 @@ describe('settings endpoints', () => {
 
             expect(response.status).toBe(404);
             const found = await seedFacade.getLocation(companyB.id, foreignLocation.id);
+            expect(found.coverageGroups).toEqual([{ id: 1, name: 'Original', departments: [] }]);
+        });
+
+        it('403s for a Manager scoped to a different Location in the same Company', async () => {
+            const company = await seedCompany();
+            const locationX = await seedLocation(company.id, { name: 'X' });
+            const locationY = await seedLocation(company.id, {
+                name: 'Y',
+                coverageGroups: [{ id: 1, name: 'Original', departments: [] }]
+            });
+            const userId = await seedManager(company.id, [locationX.id]);
+
+            const response = await locationsCoverageGroupsDeleteHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(userId),
+                body: new URLSearchParams({ locationId: locationY.id, id: '1' }).toString()
+            }));
+
+            expect(response.status).toBe(403);
+            const found = await seedFacade.getLocation(company.id, locationY.id);
             expect(found.coverageGroups).toEqual([{ id: 1, name: 'Original', departments: [] }]);
         });
     });
@@ -406,6 +489,23 @@ describe('settings endpoints', () => {
 
             expect(response.status).toBe(404);
             const found = await seedFacade.getLocation(companyB.id, foreignLocation.id);
+            expect(found.settings.hoursByDay).toEqual({});
+        });
+
+        it('403s for a Manager scoped to a different Location in the same Company', async () => {
+            const company = await seedCompany();
+            const locationX = await seedLocation(company.id, { name: 'X' });
+            const locationY = await seedLocation(company.id, { name: 'Y' });
+            const userId = await seedManager(company.id, [locationX.id]);
+
+            const response = await locationsHoursHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(userId),
+                body: new URLSearchParams({ locationId: locationY.id, ...VALID_HOURS_FORM }).toString()
+            }));
+
+            expect(response.status).toBe(403);
+            const found = await seedFacade.getLocation(company.id, locationY.id);
             expect(found.settings.hoursByDay).toEqual({});
         });
     });

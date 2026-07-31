@@ -1,4 +1,5 @@
-import { SettingsError, assertLocationEditableByViewer } from './settingsService.js';
+import { assertLocationEditableByViewer } from './settingsService.js';
+import { ScopeError } from './companyScope.js';
 import { renderCompanyTemplatePage, renderLocationEditPage } from './settingsView.js';
 
 const STATUS_BY_REASON = {
@@ -9,7 +10,7 @@ const STATUS_BY_REASON = {
     forbidden: 403
 };
 
-/** Maps a SettingsError to a bare status/body response — used where re-rendering a page would leak data the caller isn't authorized to see. */
+/** Maps a ScopeError/SettingsError to a bare status/body response — used where re-rendering a page would leak data the caller isn't authorized to see. */
 export function settingsErrorResponse(err) {
     return { status: STATUS_BY_REASON[err.reason] ?? 400, jsonBody: { error: err.message } };
 }
@@ -29,7 +30,7 @@ export async function runLocationSettingsAction(facade, target, action) {
     try {
         await action();
     } catch (err) {
-        if (err instanceof SettingsError) {
+        if (err instanceof ScopeError) {
             if (err.reason === 'not-found' || err.reason === 'forbidden') {
                 return settingsErrorResponse(err);
             }
@@ -41,7 +42,7 @@ export async function runLocationSettingsAction(facade, target, action) {
                     body: renderLocationEditPage({ location, error: err.message })
                 };
             } catch (refetchErr) {
-                if (refetchErr instanceof SettingsError) {
+                if (refetchErr instanceof ScopeError) {
                     return settingsErrorResponse(refetchErr);
                 }
                 throw refetchErr;
@@ -66,7 +67,7 @@ export async function runTemplateSettingsAction(facade, companyId, action) {
     try {
         await action();
     } catch (err) {
-        if (err instanceof SettingsError) {
+        if (err instanceof ScopeError) {
             const company = await facade.getCompany(companyId);
             return {
                 status: STATUS_BY_REASON[err.reason] ?? 400,
