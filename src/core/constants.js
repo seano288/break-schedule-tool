@@ -1,7 +1,7 @@
 /**
  * Default coverage optimization groups. Only departments that share staff
  * across subdepts get pre-grouped; everything else stays standalone and the
- * user can drag-and-drop to combine them in the wizard's Departments step.
+ * user can combine them into their own coverage groups.
  */
 export const DEFAULT_GROUPS = [
     {

@@ -4,9 +4,6 @@
   "description": "Automated break scheduling tool for UKG schedule exports",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/ api/src/ api/tests/",
@@ -18,7 +15,6 @@
   "devDependencies": {
     "@azure/static-web-apps-cli": "^2.0.6",
     "@eslint/js": "^9.0.0",
-    "@rollup/plugin-inject": "^5.0.0",
     "azurite": "^3.34.0",
     "concurrently": "^9.1.0",
     "eslint": "^9.0.0",
@@ -27,10 +23,6 @@
     "vitest": "^4.1.5"
   },
   "dependencies": {
-    "@fortawesome/fontawesome-free": "^6.5.0",
-    "bootstrap": "^4.6.2",
-    "jquery": "^3.7.0",
-    "popper.js": "^1.16.1",
     "xlsx": "^0.18.5"
   }
 }
