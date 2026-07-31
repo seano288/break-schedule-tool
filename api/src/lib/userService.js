@@ -38,7 +38,9 @@ export async function listInvitableLocations(facade, { companyId }) {
  */
 export async function createInviteForCompany(facade, { companyId, role, locationIds }) {
     assertValidRole(role);
-    const scopedLocationIds = await resolveInviteLocationIds(facade, { companyId, role, locationIds });
+    const scopedLocationIds = await resolveScopedLocationIds(facade, {
+        companyId, role, locationIds, emptyMessage: 'Select at least one Location for a Manager invite.'
+    });
 
     const createdAt = new Date();
     return facade.createInviteCode({
@@ -51,28 +53,37 @@ export async function createInviteForCompany(facade, { companyId, role, location
     });
 }
 
-async function resolveInviteLocationIds(facade, { companyId, role, locationIds }) {
+/**
+ * Full-replaces an existing User's role and Location scope together in a single write,
+ * via updateUserLinkRoleAndLocations — same scoping rules as createInviteForCompany: a
+ * Manager submission needs at least one Location belonging to this Company, and an Admin
+ * submission always forces `locationIds` to `[]` regardless of what was submitted.
+ *
+ * @param {import('../facades/TableStorageFacade.js').TableStorageFacade} facade
+ * @param {{ companyId: string, userId: string, role: string, locationIds?: string[] }} params
+ */
+export async function updateUserRoleAndLocations(facade, { companyId, userId, role, locationIds }) {
+    assertValidRole(role);
+    await assertUserBelongsToCompany(facade, companyId, userId);
+    const scopedLocationIds = await resolveScopedLocationIds(facade, {
+        companyId, role, locationIds, emptyMessage: 'Select at least one Location for a Manager.'
+    });
+
+    await facade.updateUserLinkRoleAndLocations(userId, { role, locationIds: scopedLocationIds });
+}
+
+async function resolveScopedLocationIds(facade, { companyId, role, locationIds, emptyMessage }) {
     if (role === 'Admin') {
         return [];
     }
 
     const ids = locationIds ?? [];
     if (ids.length === 0) {
-        throw new UserError('Select at least one Location for a Manager invite.', 'locations-required');
+        throw new UserError(emptyMessage, 'locations-required');
     }
 
     await assertLocationsBelongToCompany(facade, companyId, ids);
     return ids;
-}
-
-/**
- * @param {import('../facades/TableStorageFacade.js').TableStorageFacade} facade
- * @param {{ companyId: string, userId: string, role: string }} params
- */
-export async function changeUserRole(facade, { companyId, userId, role }) {
-    assertValidRole(role);
-    await assertUserBelongsToCompany(facade, companyId, userId);
-    await facade.updateUserLinkRole(userId, role);
 }
 
 /**

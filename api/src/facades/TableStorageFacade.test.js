@@ -124,19 +124,21 @@ describe('TableStorageFacade', () => {
             expect(links.map(l => l.userId)).toEqual([userA]);
         });
 
-        it('updates a user link\'s role', async () => {
+        it('updates a user link\'s role and Location scope together', async () => {
             const userId = randomUUID();
             await facade.createUserLink({
                 userId,
                 companyId: randomUUID(),
                 role: 'Manager',
-                locationIds: [],
+                locationIds: ['loc-old'],
                 createdAt: '2026-07-30T00:00:00.000Z'
             });
 
-            await facade.updateUserLinkRole(userId, 'Admin');
+            await facade.updateUserLinkRoleAndLocations(userId, { role: 'Admin', locationIds: [] });
 
-            expect((await facade.getUserLink(userId)).role).toBe('Admin');
+            const link = await facade.getUserLink(userId);
+            expect(link.role).toBe('Admin');
+            expect(link.locationIds).toEqual([]);
         });
 
         it('deletes a user link, so a later lookup returns null', async () => {

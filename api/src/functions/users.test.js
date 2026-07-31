@@ -5,7 +5,7 @@ import { TEST_TABLE_CONNECTION_STRING } from '../../tests/testTableConnection.js
 import { fakeRequest } from '../../tests/fakeRequest.js';
 import { usersListHandler } from './usersList.js';
 import { usersInviteHandler } from './usersInvite.js';
-import { usersRoleHandler } from './usersRole.js';
+import { usersEditHandler } from './usersEdit.js';
 import { usersRevokeHandler } from './usersRevoke.js';
 import { onboardingStatusHandler } from './onboardingStatus.js';
 import { locationsListHandler } from './locationsList.js';
@@ -247,9 +247,9 @@ describe('users endpoints', () => {
         });
     });
 
-    describe('POST /api/users/role', () => {
+    describe('POST /api/users/edit', () => {
         it('401s when unauthenticated', async () => {
-            const response = await usersRoleHandler(fakeRequest({ method: 'POST', body: 'userId=x&role=Admin' }));
+            const response = await usersEditHandler(fakeRequest({ method: 'POST', body: 'userId=x&role=Admin' }));
             expect(response.status).toBe(401);
         });
 
@@ -257,7 +257,7 @@ describe('users endpoints', () => {
             const company = await seedCompany();
             const managerId = await seedManager(company.id);
 
-            const response = await usersRoleHandler(fakeRequest({
+            const response = await usersEditHandler(fakeRequest({
                 method: 'POST',
                 principal: principalFor(managerId),
                 body: new URLSearchParams({ userId: managerId, role: 'Admin' }).toString()
@@ -271,7 +271,7 @@ describe('users endpoints', () => {
             const adminId = await seedAdmin(company.id);
             const managerId = await seedManager(company.id);
 
-            const response = await usersRoleHandler(fakeRequest({
+            const response = await usersEditHandler(fakeRequest({
                 method: 'POST',
                 principal: principalFor(adminId),
                 body: new URLSearchParams({ userId: managerId, role: 'Admin' }).toString()
@@ -282,13 +282,97 @@ describe('users endpoints', () => {
             expect((await seedFacade.getUserLink(managerId)).role).toBe('Admin');
         });
 
+        it('updates a Manager\'s Location scope alongside their role in the same write', async () => {
+            const company = await seedCompany();
+            const adminId = await seedAdmin(company.id);
+            const managerId = await seedManager(company.id);
+            const location = await seedLocation(company.id);
+
+            const response = await usersEditHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(adminId),
+                body: new URLSearchParams([
+                    ['userId', managerId], ['role', 'Manager'], ['locationIds', location.id]
+                ]).toString()
+            }));
+
+            expect(response.status).toBe(303);
+            expect((await seedFacade.getUserLink(managerId)).locationIds).toEqual([location.id]);
+        });
+
+        it('forces locationIds to empty when the submitted role is Admin, even if Locations were submitted', async () => {
+            const company = await seedCompany();
+            const adminId = await seedAdmin(company.id);
+            const managerId = await seedManager(company.id);
+            const location = await seedLocation(company.id);
+
+            const response = await usersEditHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(adminId),
+                body: new URLSearchParams([
+                    ['userId', managerId], ['role', 'Admin'], ['locationIds', location.id]
+                ]).toString()
+            }));
+
+            expect(response.status).toBe(303);
+            expect((await seedFacade.getUserLink(managerId)).locationIds).toEqual([]);
+        });
+
+        it('blocks a Manager edit with no Locations selected, server-side', async () => {
+            const company = await seedCompany();
+            const adminId = await seedAdmin(company.id);
+            const managerId = await seedManager(company.id);
+
+            const response = await usersEditHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(adminId),
+                body: new URLSearchParams({ userId: managerId, role: 'Manager' }).toString()
+            }));
+
+            expect(response.status).toBe(400);
+            expect(response.body).toContain('Select at least one Location');
+        });
+
+        it('rejects a Manager edit naming a Location from a different Company, failing the whole request', async () => {
+            const companyA = await seedCompany();
+            const companyB = await seedCompany();
+            const adminId = await seedAdmin(companyA.id);
+            const managerId = await seedManager(companyA.id);
+            const foreignLocation = await seedLocation(companyB.id);
+
+            const response = await usersEditHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(adminId),
+                body: new URLSearchParams([
+                    ['userId', managerId], ['role', 'Manager'], ['locationIds', foreignLocation.id]
+                ]).toString()
+            }));
+
+            expect(response.status).toBe(404);
+        });
+
+        it('re-renders the list with a clear error for an invalid role', async () => {
+            const company = await seedCompany();
+            const adminId = await seedAdmin(company.id);
+            const managerId = await seedManager(company.id);
+
+            const response = await usersEditHandler(fakeRequest({
+                method: 'POST',
+                principal: principalFor(adminId),
+                body: new URLSearchParams({ userId: managerId, role: 'Owner' }).toString()
+            }));
+
+            expect(response.status).toBe(400);
+            expect(response.body).toContain('Role must be Admin or Manager');
+        });
+
         it('404s for a userId belonging to a different Company', async () => {
             const companyA = await seedCompany();
             const companyB = await seedCompany();
             const adminId = await seedAdmin(companyA.id);
             const foreignUserId = await seedManager(companyB.id);
 
-            const response = await usersRoleHandler(fakeRequest({
+            const response = await usersEditHandler(fakeRequest({
                 method: 'POST',
                 principal: principalFor(adminId),
                 body: new URLSearchParams({ userId: foreignUserId, role: 'Admin' }).toString()

@@ -3,11 +3,11 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { TableStorageFacade } from '../facades/TableStorageFacade.js';
 import { TEST_TABLE_CONNECTION_STRING } from '../../tests/testTableConnection.js';
 import {
-    changeUserRole,
     createInviteForCompany,
     listInvitableLocations,
     listUsersForCompany,
     revokeCompanyUser,
+    updateUserRoleAndLocations,
     UserError
 } from './userService.js';
 
@@ -124,22 +124,63 @@ describe('userService', () => {
         });
     });
 
-    describe('changeUserRole', () => {
+    describe('updateUserRoleAndLocations', () => {
         it('updates the role of a User belonging to the Company', async () => {
             const companyId = randomUUID();
             const userId = await seedUser(companyId, { role: 'Manager' });
 
-            await changeUserRole(facade, { companyId, userId, role: 'Admin' });
+            await updateUserRoleAndLocations(facade, { companyId, userId, role: 'Admin' });
 
             const users = await listUsersForCompany(facade, { companyId });
             expect(users.find(u => u.userId === userId).role).toBe('Admin');
+        });
+
+        it('updates the Location scope alongside the role for a Manager', async () => {
+            const companyId = randomUUID();
+            const userId = await seedUser(companyId, { role: 'Manager' });
+            const location = await seedLocation(companyId);
+
+            await updateUserRoleAndLocations(facade, { companyId, userId, role: 'Manager', locationIds: [location.id] });
+
+            const users = await listUsersForCompany(facade, { companyId });
+            expect(users.find(u => u.userId === userId).locationIds).toEqual([location.id]);
+        });
+
+        it('forces an empty locationIds when the submitted role is Admin, even if some were submitted', async () => {
+            const companyId = randomUUID();
+            const userId = await seedUser(companyId, { role: 'Manager' });
+            const location = await seedLocation(companyId);
+
+            await updateUserRoleAndLocations(facade, { companyId, userId, role: 'Admin', locationIds: [location.id] });
+
+            const users = await listUsersForCompany(facade, { companyId });
+            expect(users.find(u => u.userId === userId).locationIds).toEqual([]);
+        });
+
+        it('rejects a Manager edit with no Locations selected', async () => {
+            const companyId = randomUUID();
+            const userId = await seedUser(companyId, { role: 'Manager' });
+
+            await expect(updateUserRoleAndLocations(facade, { companyId, userId, role: 'Manager', locationIds: [] }))
+                .rejects.toMatchObject({ reason: 'locations-required' });
+        });
+
+        it('rejects a Manager edit naming a Location from a different Company', async () => {
+            const companyA = randomUUID();
+            const companyB = randomUUID();
+            const userId = await seedUser(companyA, { role: 'Manager' });
+            const foreignLocation = await seedLocation(companyB);
+
+            await expect(updateUserRoleAndLocations(facade, {
+                companyId: companyA, userId, role: 'Manager', locationIds: [foreignLocation.id]
+            })).rejects.toMatchObject({ reason: 'not-found' });
         });
 
         it('rejects an invalid role', async () => {
             const companyId = randomUUID();
             const userId = await seedUser(companyId);
 
-            await expect(changeUserRole(facade, { companyId, userId, role: 'Owner' }))
+            await expect(updateUserRoleAndLocations(facade, { companyId, userId, role: 'Owner' }))
                 .rejects.toMatchObject({ reason: 'invalid-role' });
         });
 
@@ -148,7 +189,7 @@ describe('userService', () => {
             const companyB = randomUUID();
             const userId = await seedUser(companyB);
 
-            await expect(changeUserRole(facade, { companyId: companyA, userId, role: 'Admin' }))
+            await expect(updateUserRoleAndLocations(facade, { companyId: companyA, userId, role: 'Admin' }))
                 .rejects.toMatchObject({ reason: 'not-found' });
         });
     });

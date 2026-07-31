@@ -1,8 +1,8 @@
 /**
  * Server-rendered HTML for the Users screen — Admin-only, matching
- * locationView.js/onboardingView.js's plain-forms style, plus a small inline
- * script on the invite form to toggle/require the Location checkboxes
- * client-side (the server independently enforces the same rule).
+ * locationView.js/onboardingView.js's plain-forms style, plus small inline
+ * scripts on the invite form and each per-User edit form to toggle/require the
+ * Location checkboxes client-side (the server independently enforces the same rule).
  */
 
 export function renderUsersPage({ users, locations = [], error, notice } = {}) {
@@ -11,7 +11,8 @@ export function renderUsersPage({ users, locations = [], error, notice } = {}) {
         ${error ? `<p class="error">${escapeHtml(error)}</p>` : ''}
         ${notice ? `<p class="notice">${escapeHtml(notice)}</p>` : ''}
         ${renderInviteForm(locations)}
-        ${renderUserList(users)}
+        ${renderUserList(users, locations)}
+        ${locations.length > 0 ? renderUserEditFormScript() : ''}
     `);
 }
 
@@ -92,31 +93,96 @@ function renderInviteFormScript() {
     `;
 }
 
-function renderUserList(users) {
+function renderUserList(users, locations) {
     if (users.length === 0) {
         return '<p>No users yet.</p>';
     }
-    return `<ul>${users.map(renderUserItem).join('')}</ul>`;
+    return `<ul>${users.map(user => renderUserItem(user, locations)).join('')}</ul>`;
 }
 
-function renderUserItem(user) {
+function renderUserItem(user, locations) {
     const label = escapeHtml(user.userDetails || user.userId);
+    const hasLocations = locations.length > 0;
     return `
         <li>
-            ${label} — ${escapeHtml(user.role)}
-            <form method="post" action="/api/users/role">
+            ${label}
+            <form method="post" action="/api/users/edit" class="user-edit-form">
                 <input type="hidden" name="userId" value="${escapeHtml(user.userId)}">
-                <select name="role" required>
+                <select name="role" class="user-edit-role" required>
                     <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
                     <option value="Manager" ${user.role === 'Manager' ? 'selected' : ''}>Manager</option>
                 </select>
-                <button type="submit">Change role</button>
+                ${hasLocations ? renderUserEditLocations(locations, user) : ''}
+                <button type="submit">Save</button>
             </form>
             <form method="post" action="/api/users/revoke">
                 <input type="hidden" name="userId" value="${escapeHtml(user.userId)}">
                 <button type="submit">Revoke access</button>
             </form>
         </li>
+    `;
+}
+
+function renderUserEditLocations(locations, user) {
+    const isManager = user.role === 'Manager';
+    const checkedIds = new Set(user.locationIds ?? []);
+    return `
+        <div class="user-edit-locations" ${isManager ? '' : 'hidden'}>
+            <ul>
+                ${locations.map(location => `
+                    <li>
+                        <label>
+                            <input type="checkbox" name="locationIds" value="${escapeHtml(location.id)}" ${checkedIds.has(location.id) ? 'checked' : ''}>
+                            ${escapeHtml(location.name)}
+                        </label>
+                    </li>
+                `).join('')}
+            </ul>
+            <p class="error user-edit-locations-message" hidden>Select at least one Location.</p>
+        </div>
+    `;
+}
+
+function renderUserEditFormScript() {
+    return `
+        <script>
+        (function () {
+            function checkboxesFor(form) {
+                return Array.prototype.slice.call(form.querySelectorAll('input[name="locationIds"]'));
+            }
+
+            function initForm(form) {
+                var roleSelect = form.querySelector('.user-edit-role');
+                var locationsSection = form.querySelector('.user-edit-locations');
+                if (!locationsSection) return;
+                var message = form.querySelector('.user-edit-locations-message');
+                var submitButton = form.querySelector('button[type="submit"]');
+
+                function isManagerBlocked() {
+                    return roleSelect.value === 'Manager' && !checkboxesFor(form).some(function (cb) { return cb.checked; });
+                }
+
+                function update() {
+                    var isManager = roleSelect.value === 'Manager';
+                    locationsSection.hidden = !isManager;
+                    var blocked = isManagerBlocked();
+                    message.hidden = !blocked;
+                    submitButton.disabled = blocked;
+                }
+
+                form.addEventListener('submit', function (event) {
+                    if (isManagerBlocked()) {
+                        event.preventDefault();
+                    }
+                });
+                roleSelect.addEventListener('change', update);
+                checkboxesFor(form).forEach(function (cb) { cb.addEventListener('change', update); });
+                update();
+            }
+
+            Array.prototype.slice.call(document.querySelectorAll('.user-edit-form')).forEach(initForm);
+        })();
+        </script>
     `;
 }
 

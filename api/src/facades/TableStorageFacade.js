@@ -127,11 +127,15 @@ export class TableStorageFacade {
     }
 
     /**
+     * Full-replaces a UserLink's role and Location scope together in a single write.
      * @param {string} userId
-     * @param {string} role
+     * @param {{ role: string, locationIds: string[] }} update
      */
-    async updateUserLinkRole(userId, role) {
-        await this._userLinks.updateEntity({ partitionKey: userId, rowKey: 'link', role }, 'Merge');
+    async updateUserLinkRoleAndLocations(userId, { role, locationIds }) {
+        await this._userLinks.updateEntity(
+            { partitionKey: userId, rowKey: 'link', role, locationIds: JSON.stringify(locationIds) },
+            'Merge'
+        );
     }
 
     /**

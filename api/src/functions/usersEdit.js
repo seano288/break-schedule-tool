@@ -2,9 +2,9 @@ import { app } from '@azure/functions';
 import { parseClientPrincipal } from '../lib/clientPrincipal.js';
 import { getFacade } from '../lib/facadeInstance.js';
 import { runUserAction } from '../lib/userHttp.js';
-import { changeUserRole } from '../lib/userService.js';
+import { updateUserRoleAndLocations } from '../lib/userService.js';
 
-export async function usersRoleHandler(request) {
+export async function usersEditHandler(request) {
     const principal = parseClientPrincipal(request.headers.get('x-ms-client-principal'));
     if (!principal) {
         return { status: 401, jsonBody: { error: 'Unauthenticated' } };
@@ -21,13 +21,18 @@ export async function usersRoleHandler(request) {
 
     const form = new URLSearchParams(await request.text());
     return runUserAction(facade, link, () =>
-        changeUserRole(facade, { companyId: link.companyId, userId: form.get('userId'), role: form.get('role') })
+        updateUserRoleAndLocations(facade, {
+            companyId: link.companyId,
+            userId: form.get('userId'),
+            role: form.get('role'),
+            locationIds: form.getAll('locationIds')
+        })
     );
 }
 
-app.http('usersRole', {
+app.http('usersEdit', {
     methods: ['POST'],
     authLevel: 'anonymous',
-    route: 'users/role',
-    handler: usersRoleHandler
+    route: 'users/edit',
+    handler: usersEditHandler
 });
