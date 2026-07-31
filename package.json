@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src/",
+    "lint": "eslint src/ api/src/ api/tests/",
     "tracer:azurite": "azurite --silent --location .azurite --debug .azurite/debug.log",
     "tracer:api": "npm --prefix api start",
     "tracer:web": "cd web && swa start",

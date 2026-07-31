@@ -19,6 +19,16 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
     tags: tags
 }
 
+module storage './app/storage.bicep' = {
+    name: 'storage'
+    scope: rg
+    params: {
+        name: 'st${uniqueString(rg.id)}'
+        location: location
+        tags: tags
+    }
+}
+
 module web './app/web.bicep' = {
     name: 'web'
     scope: rg
@@ -26,6 +36,7 @@ module web './app/web.bicep' = {
         name: '${environmentName}-web'
         location: location
         tags: tags
+        tableStorageConnectionString: storage.outputs.connectionString
     }
 }
 

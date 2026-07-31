@@ -13,9 +13,9 @@ export default [
             globals: globals.browser
         }
     },
-    // Test files run in Node via Vitest.
+    // Test files run in Node via Vitest, as does all of api/ (an Azure Functions app).
     {
-        files: ['tests/**/*.js'],
+        files: ['tests/**/*.js', 'api/src/**/*.js', 'api/tests/**/*.js'],
         languageOptions: {
             globals: globals.node
         }
