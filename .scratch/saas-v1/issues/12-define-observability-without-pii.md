@@ -4,6 +4,8 @@ Type: grilling
 Status: open
 Blocked by: 09
 
+> **Input from [#10](10-set-per-request-size-ceiling.md).** #10 specifies **what it needs measured and its act-on thresholds**; this ticket owns **the mechanism** — where the numbers land, and who reviews them. Fields (emitted per `/schedule` request by #10's between-partition guard, all aggregate integers — no names, no ids): partition employee count, partition CPU ms, day count, total CPU ms, outcome (`ok` / `budget-exceeded`). Thresholds: **A** — one confirmed-legitimate budget exceedance raises the 60 s budget (n=1, a blocked customer); **C** — p99 partition CPU >20 s or a legitimate location-week >150 s gates `core/` optimisation. Note trigger A requires **confirming a budget exceedance was a single real location**, which no metric can settle alone — so the mechanism needs a path from an anonymous counter to a customer conversation. Also worth capturing: opaque platform kills (error 1102) are invisible to the guard and observable **only** in Workers Logs.
+
 > **Raised by [#09](09-define-compute-api-surface.md).** The map's performance principle — *design for simplicity, instrument well, optimise only on confirmed need* — is only sound if the confirming data actually gets collected. Nothing on the map currently says what v1 measures. This ticket makes the instrumentation half of that principle real.
 
 ## Question

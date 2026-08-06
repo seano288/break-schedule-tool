@@ -60,7 +60,7 @@ Tier 2 is separated deliberately: Location is a UKG **run parameter**, so a mana
 POST /inspect   (multipart: rawFile)
   → { presetId,
       locationSource: 'column' | 'document' | 'assumed',
-      locations:   [{ key, label, dayCount, employeeCount }],
+      locations:   [{ key, label, dayCount, employeeCount, sizeWarning }],   // sizeWarning added by #10
       departments: [{ main, sub }],
       notices:     [ ... ],       // document-level
       exceptions:  [ ...SOURCE_ROW_UNPARSEABLE ],
@@ -90,6 +90,8 @@ Rejected: **one endpoint returning a zip** (all partitions in one invocation →
 **8. Both endpoints Clerk-gated; one entitlement helper, validated but permissive.** `/inspect` is included — it parses a customer file (processing their data) and is the cheapest probe surface. On trial gating, #07's "beta is a rollout mode of v1, not a smaller v1" was reconciled with the simplicity principle by a single `requireEntitlement(session)` call at the top of both handlers, reading the Clerk org's subscription state, with one config flag granting everyone during the beta. **The logic is exercised and tested, it just answers permissively** — a few lines, not a subsystem, and the version that goes wrong is the one *added* under pressure on the day charging starts. Explicitly **not** built: the tiered abuse rate-limiter (deferred by #07; the price of opening the invite gate).
 
 **9. Size ceiling — advisory at `/inspect`, binding at `/schedule`, failing one location.** `/inspect`'s `employeeCount` lets the client pre-mark will-fail locations so the user learns up front rather than three minutes into a fan-out; but that is courtesy, not control, since a client can skip `/inspect` entirely and the server trusts nothing from it. Per-location failure follows from decision 6 plus #06's tiered errors rather than being a fresh call. **Consequence for #10:** a tier-3 file that really merged ten stores collapses into one oversize partition and **is caught here** — the ceiling is the detector for the one case decision 2's advisory notice cannot detect. Separately, a plain **request-body guard** (Workers allows 100 MB; real uploads are tens of KB) to refuse the absurd before parsing.
+
+> **Amended by [#10](10-set-per-request-size-ceiling.md).** Two changes. (1) **There is no ceiling** — v1 declares no employee limit, so "pre-mark will-fail locations" client-side is unimplementable as written; the binding guard is a **60 s elapsed-CPU budget** checked between workday partitions, and the advisory is a **server-computed `sizeWarning`** flag added to each `locations[]` entry (threshold = that budget expressed in employees, ~450–500). Computed server-side so it cannot drift out of sync with the actual guard, and so the client ships nothing derived from `core/`. "Courtesy, not control" stands unchanged. (2) The request-body guard is set at **10 MB** with its own distinct wrong-file message — never the too-large-to-schedule copy, which would send the user chasing a multi-location cause for what is a wrong-file problem.
 
 ### Structural finding: a document-level notice channel is now needed
 

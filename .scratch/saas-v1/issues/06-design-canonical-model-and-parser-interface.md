@@ -62,6 +62,8 @@ One record per source row. No nesting, **no provenance**.
 
 5. **Parser shape — one code module per source format.** `Parser { id, detect(wb) → confidence, parse(wb, opts) → outcome }`, resolved by a registry that rejects rather than best-guessing. No shared column-map abstraction: we know one format in detail, so this avoids designing a DSL from n=1. Consequences accepted: the UKG module carries its **own** header-synonym table (needed regardless, since UKG columns are admin-configurable), and **v2's B-map becomes a new parser** rather than a preset instance.
 
+   > **Extended by [#10](10-set-per-request-size-ceiling.md):** a parser module also owns its **user-facing remediation copy**. #10's too-large-to-schedule message must tell the user how to re-export one location at a time, and that instruction is format-specific (for UKG it is the **Hyperfind** run parameter, per #08) — so remediation hints are preset-scoped, not generic, and each future parser supplies its own.
+
 6. **Error contract — tiered, and a bad row poisons that employee's workday.**
    - *Fatal* (`FORMAT_UNRECOGNIZED`, `REQUIRED_COLUMN_MISSING`, `EMPLOYEE_ID_MISSING`) → reject the whole upload, produce nothing.
    - *Row-level*: a row recognised as an employee row but unparseable marks that **employee-day unschedulable and reports it**. Not merely excluded — dropping the row alone would leave their hour total short, silently changing the required break count. Other employees still process.
