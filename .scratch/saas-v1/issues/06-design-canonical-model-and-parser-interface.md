@@ -75,6 +75,15 @@ Three independent stages now produce the same kind of per-employee-day exception
 
 Relatedly, `EmployeeDayResult.breaks` has **five named slots** (`rest1, meal1, rest2, meal2, rest3`). Today's four-slot model stuffs the second meal into `rest3` only when free, so a >10h shift — which always fills `rest3` with its third rest — silently loses it (#01 bug B1). Naming every slot makes that collision unrepresentable.
 
+### Amendment (from [#09](09-define-compute-api-surface.md))
+
+The model above **omits `location`**, and the prototype parser ignores the UKG `Location:` row. #09 found this is not cosmetic: coverage groups key on `dept`/`job`, so two stores that both have `Frontline/Cashier` collapse into **one coverage pool** and the optimizer staggers breaks between employees who never share a building. #07 and #10 both already assumed a `(location, workday)` partition that could not exist.
+
+- **`Segment` gains `location: string`** — required and non-null. The parser always synthesizes a value, so `core/` partitions by `(location, workday)` with no null branch.
+- **A document-level `locationSource: 'column' | 'document' | 'assumed'`** records where it came from: a per-row column; the report's `Location:` state row naming a single store (a real fact — Location is a UKG run parameter); or assumed, when the row is absent or says "All Home Locations".
+- **`assumed` raises an advisory notice, not a rejection.** Unlike a missing `employeeId`, a merged pool degrades schedule *quality*, never legality — meal placement is bounded to its legal window before the optimizer sees it (`BreakScheduler.js:193-199`). Single-location customers must not be blocked by a column they have no reason to have.
+- The parser's day-splitting/grouping responsibilities are unchanged; only the field set and the notice channel grow.
+
 ### Generated
 
 - **#08** (research, blocking): confirm the UKG export can emit an employee-number column. If it cannot, decision 2's invariant returns as a fresh decision.
