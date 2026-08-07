@@ -86,6 +86,20 @@ The model above **omits `location`**, and the prototype parser ignores the UKG `
 - **`assumed` raises an advisory notice, not a rejection.** Unlike a missing `employeeId`, a merged pool degrades schedule *quality*, never legality — meal placement is bounded to its legal window before the optimizer sees it (`BreakScheduler.js:193-199`). Single-location customers must not be blocked by a column they have no reason to have.
 - The parser's day-splitting/grouping responsibilities are unchanged; only the field set and the notice channel grow.
 
+### Amendment (from [#11](11-decide-missing-employee-id-fallback.md)) — decision 2 replaced
+
+**Decision 2's hard rejection does not ship.** Its *hazard* is confirmed and unchanged; what #11 overturned is the response, after [#08](08-confirm-ukg-employee-id-column.md) established the id column costs an **admin report re-design of unknown feasibility** — and that the anchor customer has no id column today, so the invariant rejects 100% of the one real file in existence.
+
+#11's decisive finding is that the fallback this decision assumed was available does **not** exist: an ambiguous employee-day cannot be scheduled correctly in *either* direction. Merging cancels a required meal (as decision 2 argued); **splitting under-schedules a genuine split shift** — a 4h + 6h split-shift worker is owed 2 meals but gets 1 when treated as two people. So there is no safe default to fall back to, only a detectable ambiguity to refuse.
+
+- **`Segment.employeeId` → `employeeKey`** — still required and non-null, so `core/` keeps its no-null-branch property. The parser always synthesizes a key. It is **any stable key the parser can name**, not "the id column": email qualifies (#08 found Deputy's shift-grain interchange format matches on email with no id at all).
+- **Document-level `identityKind: 'unique' | 'ambiguous'`** — the only field `core/` branches on. Binary because the behavior-changing question is binary: *can this key collide?* Email is `unique`; a name is `ambiguous`.
+- **Document-level `identityLabel`** — free text (`"Employee ID"`, `"Email"`, `"Employee Name"`) for the manager notice and #12 telemetry. Keeping this separate from `identityKind` means a future parser adds a label, never a `core/` branch.
+- **New `ExceptionCode: 'IDENTITY_AMBIGUOUS'`** on this ticket's existing per-employee-day channel. Under `identityKind === 'ambiguous'` only, an employee-day whose key carries **more than one segment** is emitted and scheduled not at all. Inert under `unique`, where a multi-segment day is a legitimate split shift — which is precisely why provenance must reach `core/` rather than stopping at the UI. Owned by `core/` per decision 1's "one audited home"; parser-side poisoning was rejected because decision 5's one-module-per-format rule would make every future parser re-implement a compliance rule.
+- **`FatalCode.EMPLOYEE_ID_MISSING` is removed.** A missing id column is a downgrade, not a rejection. `FORMAT_UNRECOGNIZED` / `REQUIRED_COLUMN_MISSING` unaffected.
+- **Decision 6 sharpened:** an id column **blank on every row** is re-read as *absent* (→ name-keyed), not as every row poisoned. The `SOURCE_ROW_UNPARSEABLE`-on-blank-cell rule governs the **partially-populated** case it was written for. #08 warns present-but-blank is the common case, since vendors ship the id as optional/employer-populated.
+- **Decision 4 grows a surface:** the freshly-rendered workbook carries an **identity banner** in `ambiguous` mode. The workbook is what reaches HR; a UI-only warning dies at download.
+
 ### Generated
 
 - **#08** (research, blocking): confirm the UKG export can emit an employee-number column. If it cannot, decision 2's invariant returns as a fresh decision.
