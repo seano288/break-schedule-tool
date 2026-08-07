@@ -36,7 +36,7 @@ From [#06](06-design-canonical-model-and-parser-interface.md) / [#11](11-decide-
 
 ## To decide
 
-1. **Framework and build** — what the shell is written in, on Cloudflare Pages, integrating Clerk's drop-in components.
+1. **Framework and build** — what the shell is written in, on Cloudflare Pages, integrating Clerk's drop-in components. **One constraint surfaced by [#14](14-research-clerk-billing-per-location.md):** Clerk publishes its component and hook references **per SDK** (Next.js, React, Expo, React Router, TanStack, Nuxt, js-frontend), so "Clerk drop-in components" is not framework-neutral — check the chosen framework against that list rather than assuming parity. (#14 also confirmed `@clerk/backend` runs in V8 isolates, so the *server* half is settled either way.)
 2. **The step model.** The old wizard's order is not binding, and #09's contract reshapes it: upload now precedes configuration because departments come from the parse. Whether the result is still a wizard at all is open.
 3. **Where settings live.** No v1 persistence is the current position — worth testing, since a manager re-uploading weekly re-enters coverage groups every time. Note **re-upload per location** was accepted for v1 in #09 with a written ~20-location trigger for revisiting the KV handle.
 4. **How the fan-out and its per-location states are modelled**, given obligations 2–4 are simultaneous and partial failure is first-class rather than exceptional.
