@@ -26,8 +26,11 @@ Thumbs.db
 .claude/
 
 # Internal documents (not for public repos)
+# Real customer schedule exports land here as .xlsx (report) or .csv (Dataview)
+# and carry employee names — never commit them.
 *.pdf
 *.xlsx
+*.csv
 
 # Legacy data file (superseded by src/core/constants.js)
 coverage-groups.json
